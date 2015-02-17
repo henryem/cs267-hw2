@@ -1,0 +1,25 @@
+#PBS -V
+#PBS -l mppwidth=1
+#PBS -l mppdepth=24
+#PBS -l walltime=0:20:00
+#PBS -o auto-pthreads24.stdout
+#PBS -j oe
+#PBS -A mp309
+
+cd $PBS_O_WORKDIR
+rm pthreads.txt
+aprun -d 1 -n 1 -N 1 ./serial -n 500 -no -s pthreads.txt
+aprun -d 1 -n 1 -N 1 ./pthreads -p 1 -n 500 -no -s pthreads.txt
+aprun -d 2 -n 1 -N 1 ./pthreads -p 2 -n 500 -no -s pthreads.txt
+aprun -d 4 -n 1 -N 1 ./pthreads -p 4 -n 500 -no -s pthreads.txt
+aprun -d 6 -n 1 -N 1 ./pthreads -p 6 -n 500 -no -s pthreads.txt
+aprun -d 12 -n 1 -N 1 ./pthreads -p 12 -n 500 -no -s pthreads.txt
+aprun -d 18 -n 1 -N 1 ./pthreads -p 18 -n 500 -no -s pthreads.txt
+aprun -d 24 -n 1 -N 1 ./pthreads -p 24 -n 500 -no -s pthreads.txt
+aprun -d 2 -n 1 -N 1 ./pthreads -p 2 -n 1000 -no -s pthreads.txt
+aprun -d 4 -n 1 -N 1 ./pthreads -p 4 -n 2000 -no -s pthreads.txt
+aprun -d 6 -n 1 -N 1 ./pthreads -p 6 -n 3000 -no -s pthreads.txt
+aprun -d 12 -n 1 -N 1 ./pthreads -p 12 -n 6000 -no -s pthreads.txt
+aprun -d 18 -n 1 -N 1 ./pthreads -p 18 -n 9000 -no -s pthreads.txt
+aprun -d 24 -n 1 -N 1 ./pthreads -p 24 -n 12000 -no -s pthreads.txt
+./autograder -v pthreads -s pthreads.txt

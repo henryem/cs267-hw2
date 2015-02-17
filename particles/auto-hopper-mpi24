@@ -1,0 +1,24 @@
+#PBS -V
+#PBS -l mppwidth=24
+#PBS -l walltime=0:20:00
+#PBS -o auto-mpi24.stdout
+#PBS -j oe
+#PBS -A mp309
+
+cd $PBS_O_WORKDIR
+rm mpi.txt
+aprun -d 1 -n 1 -N 1 ./serial -n 500 -no -s mpi.txt
+aprun -d 1 -n 1 -N 1 ./mpi -p 1 -n 500 -no -s mpi.txt
+aprun -d 1 -n 2 -N 2 ./mpi -p 2 -n 500 -no -s mpi.txt
+aprun -d 1 -n 4 -N 4 ./mpi -p 4 -n 500 -no -s mpi.txt
+aprun -d 1 -n 6 -N 6 ./mpi -p 6 -n 500 -no -s mpi.txt
+aprun -d 1 -n 12 -N 12 ./mpi -p 12 -n 500 -no -s mpi.txt
+aprun -d 1 -n 18 -N 18 ./mpi -p 18 -n 500 -no -s mpi.txt
+aprun -d 1 -n 24 -N 24 ./mpi -p 24 -n 500 -no -s mpi.txt
+aprun -d 1 -n 2 -N 2 ./mpi -p 2 -n 1000 -no -s mpi.txt
+aprun -d 1 -n 4 -N 4 ./mpi -p 4 -n 2000 -no -s mpi.txt
+aprun -d 1 -n 6 -N 6 ./mpi -p 6 -n 3000 -no -s mpi.txt
+aprun -d 1 -n 12 -N 12 ./mpi -p 12 -n 6000 -no -s mpi.txt
+aprun -d 1 -n 18 -N 18 ./mpi -p 18 -n 9000 -no -s mpi.txt
+aprun -d 1 -n 24 -N 24 ./mpi -p 24 -n 12000 -no -s mpi.txt
+./autograder -v mpi -s mpi.txt

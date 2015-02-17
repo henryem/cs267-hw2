@@ -1,0 +1,39 @@
+#PBS -V
+#PBS -l mppwidth=1
+#PBS -l mppdepth=24
+#PBS -l walltime=0:20:00
+#PBS -S /bin/bash
+#PBS -o auto-openmp24.stdout
+#PBS -j oe
+#PBS -A mp309
+
+cd $PBS_O_WORKDIR
+rm openmp.txt
+aprun -d 1 -n 1 -N 1 ./serial -n 500 -no -s openmp.txt
+export OMP_NUM_THREADS=1
+aprun -d 1 -n 1 -N 1 ./openmp -p 1 -n 500 -no -s openmp.txt
+export OMP_NUM_THREADS=2
+aprun -d 2 -n 1 -N 1 ./openmp -p 2 -n 500 -no -s openmp.txt
+export OMP_NUM_THREADS=4
+aprun -d 4 -n 1 -N 1 ./openmp -p 4 -n 500 -no -s openmp.txt
+export OMP_NUM_THREADS=6
+aprun -d 6 -n 1 -N 1 ./openmp -p 6 -n 500 -no -s openmp.txt
+export OMP_NUM_THREADS=12
+aprun -d 12 -n 1 -N 1 ./openmp -p 12 -n 500 -no -s openmp.txt
+export OMP_NUM_THREADS=18
+aprun -d 18 -n 1 -N 1 ./openmp -p 18 -n 500 -no -s openmp.txt
+export OMP_NUM_THREADS=24
+aprun -d 24 -n 1 -N 1 ./openmp -p 24 -n 500 -no -s openmp.txt
+export OMP_NUM_THREADS=2
+aprun -d 2 -n 1 -N 1 ./openmp -p 2 -n 1000 -no -s openmp.txt
+export OMP_NUM_THREADS=4
+aprun -d 4 -n 1 -N 1 ./openmp -p 4 -n 2000 -no -s openmp.txt
+export OMP_NUM_THREADS=6
+aprun -d 6 -n 1 -N 1 ./openmp -p 6 -n 3000 -no -s openmp.txt
+export OMP_NUM_THREADS=12
+aprun -d 12 -n 1 -N 1 ./openmp -p 12 -n 6000 -no -s openmp.txt
+export OMP_NUM_THREADS=18
+aprun -d 18 -n 1 -N 1 ./openmp -p 18 -n 9000 -no -s openmp.txt
+export OMP_NUM_THREADS=24
+aprun -d 24 -n 1 -N 1 ./openmp -p 24 -n 12000 -no -s openmp.txt
+./autograder -v openmp -s openmp.txt
