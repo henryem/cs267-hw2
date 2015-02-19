@@ -5,6 +5,10 @@
 #include <pthread.h>
 #include "common.h"
 
+#ifdef CUSTOM_PTHREAD_BARRIER
+#include "pthread_barrier.h"
+#endif
+
 //
 //  global variables
 //
