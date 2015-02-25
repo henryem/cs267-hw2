@@ -29,8 +29,7 @@ double gabsmin=1.0,gabsavg=0.0;
 //
 void *thread_routine( void *pthread_id )
 {
-    int navg,nabsavg=0;
-    double dmin,absmin=1.0,davg,absavg=0.0;
+    Stats overall_stats;
     int thread_id = *(int*)pthread_id;
 
     int particles_per_thread = (n + n_threads - 1) / n_threads;
@@ -42,9 +41,7 @@ void *thread_routine( void *pthread_id )
     //
     for( int step = 0; step < NSTEPS; step++ )
     {
-        dmin = 1.0;
-        navg = 0;
-        davg = 0.0;
+        Stats step_stats;
         //
         //  compute forces
         //
@@ -52,22 +49,15 @@ void *thread_routine( void *pthread_id )
         {
             particles[i].ax = particles[i].ay = 0;
             for (int j = 0; j < n; j++ )
-                apply_force( particles[i], particles[j], &dmin, &davg, &navg );
+                apply_force( particles[i], particles[j], step_stats);
         }
         
         pthread_barrier_wait( &barrier );
         
         if( no_output == 0 )
         {
-          //
-          // Computing statistical data
-          // 
-          if (navg) {
-            absavg +=  davg/navg;
-            nabsavg++;
-          }
-          if (dmin < absmin) absmin = dmin;
-	}
+          overall_stats.aggregate_left(step_stats);
+	      }
 
         //
         //  move particles
@@ -88,14 +78,12 @@ void *thread_routine( void *pthread_id )
      
     if (no_output == 0 )
     {
-      absavg /= nabsavg; 	
       //printf("Thread %d has absmin = %lf and absavg = %lf\n",thread_id,absmin,absavg);
       pthread_mutex_lock(&mutex);
-      gabsavg += absavg;
-      if (absmin < gabsmin) gabsmin = absmin;
+      //FIXME: Need to aggregate into global stats here, under a lock.
       pthread_mutex_unlock(&mutex);    
     }
-
+    
     return NULL;
 }
 
@@ -164,7 +152,6 @@ int main( int argc, char **argv )
 
     if( find_option( argc, argv, "-no" ) == -1 )
     {
-      gabsavg /= (n_threads*1.0);
       // 
       //  -the minimum distance absmin between 2 particles during the run of the simulation
       //  -A Correct simulation will have particles stay at greater than 0.4 (of cutoff) with typical values between .7-.8
@@ -172,9 +159,10 @@ int main( int argc, char **argv )
       //
       //  -The average distance absavg is ~.95 when most particles are interacting correctly and ~.66 when no particles are interacting
       //
-      printf( ", absmin = %lf, absavg = %lf", gabsmin, gabsavg);
-      if (gabsmin < 0.4) printf ("\nThe minimum distance is below 0.4 meaning that some particle is not interacting ");
-      if (gabsavg < 0.8) printf ("\nThe average distance is below 0.8 meaning that most particles are not interacting ");
+      //FIXME: Need to calculate overall_stats appropriately.
+      // printf( ", absmin = %lf, absavg = %lf", overall_stats.min, overall_stats.avg);
+      // if (overall_stats.min < 0.4) printf ("\nThe minimum distance is below 0.4 meaning that some particle is not interacting");
+      // if (overall_stats.avg < 0.8) printf ("\nThe average distance is below 0.8 meaning that most particles are not interacting");
     }
     printf("\n");
 

@@ -1,6 +1,8 @@
 #if !defined(PTHREAD_BARRIER_SUBST_)
 #define PTHREAD_BARRIER_SUBST_
 
+#include <pthread.h>
+
 typedef struct pthread_barrier_t {
   pthread_mutex_t mtx;
   pthread_cond_t cv;

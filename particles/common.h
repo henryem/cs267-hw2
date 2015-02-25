@@ -1,8 +1,13 @@
 #ifndef __CS267_COMMON_H__
 #define __CS267_COMMON_H__
 
+#include <stdio.h>
+#include "Stats.h"
+
 inline int min( int a, int b ) { return a < b ? a : b; }
+inline double min( double a, double b ) { return a < b ? a : b; }
 inline int max( int a, int b ) { return a > b ? a : b; }
+inline double max( double a, double b ) { return a > b ? a : b; }
 
 //
 //  saving parameters
@@ -31,11 +36,10 @@ double read_timer( );
 //
 //  simulation routines
 //
-void set_size( int n );
+double set_size( int n );
 void init_particles( int n, particle_t *p );
-void apply_force( particle_t &particle, particle_t &neighbor , double *dmin, double *davg, int *navg);
+void apply_force( particle_t &particle, particle_t &neighbor, Stats &stats);
 void move( particle_t &p );
-
 
 //
 //  I/O routines
