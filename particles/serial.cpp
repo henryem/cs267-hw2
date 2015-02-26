@@ -15,12 +15,11 @@ void simulate_step(int num_particles, particle_t* particles, double size, int nu
   for( int i = 0; i < num_particles; i++ ) {
     particle_t& p = particles[i];
     p.ax = p.ay = 0;
-    SimpleIterator<particle_t&>& neighbors = g.neighbor_iterator(p);
-    while (neighbors.hasNext()) {
-      particle_t& neighbor = neighbors.next();
+    std::unique_ptr<SimpleIterator<particle_t&> > neighbors = g.neighbor_iterator(p);
+    while (neighbors->hasNext()) {
+      particle_t& neighbor = neighbors->next();
       apply_force(p, neighbor, step_stats);
     }
-    delete &neighbors;
   }
 
   //

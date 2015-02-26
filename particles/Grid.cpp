@@ -5,6 +5,8 @@
  *      Author: henrym
  */
 
+#include <memory>
+
 #include "Grid.h"
 #include "SimpleIterator.h"
 #include "common.h"
@@ -18,7 +20,7 @@
 class ParticleIterator : public SimpleIterator<particle_t&> {
 private:
   const Grid& g;
-  SimpleIterator<int>& grid_squares_iterator;
+  std::unique_ptr<SimpleIterator<int> > grid_squares_iterator;
   // Uninitialized until has_started is true.  Nonsense if has_finished is
   // true.
   // Otherwise this always points to a valid square.  (If there are no
@@ -34,41 +36,50 @@ private:
   bool has_finished;
 
 public:
-  ParticleIterator(const Grid& g_v, SimpleIterator<int>& grid_squares_iterator_v):
+  ParticleIterator(const Grid& g_v, std::unique_ptr<SimpleIterator<int> > grid_squares_iterator_v):
       g(g_v),
-      grid_squares_iterator(grid_squares_iterator_v),
+      grid_squares_iterator(std::move(grid_squares_iterator_v)),
       square_idx(0),
       particle_in_square_idx(0),
       has_started(false),
       has_finished(false) { }
 
-  ~ParticleIterator() {
-    delete &grid_squares_iterator;
-  }
+  ~ParticleIterator() { }
 
-  bool hasNext() const {
+  bool hasNext() {
+    // has_finished is set by next().
     if (has_finished) {
       return false;
     }
     if (!has_started) {
-      return grid_squares_iterator.hasNext();
+      // Search for a non-empty grid square and start there.  Since hasNext()
+      // must be called before next(), we don't have to worry about repeating
+      // this initialization in next().
+      while (grid_squares_iterator->hasNext()) {
+        int next_square_idx = grid_squares_iterator->next();
+        if (!g.square(next_square_idx).empty()) {
+          this->square_idx = next_square_idx;
+          has_started = true;
+          return true;
+        }
+      }
+      // No grid squares had elements.
+      return false;
+    } else {
+      return true;
     }
-    return true;
   }
 
   particle_t& next() {
-    if (!has_started) {
-      square_idx = grid_squares_iterator.next();
-      has_started = true;
-    }
-    particle_t& p = *(g.squares[square_idx][particle_in_square_idx]);
+    particle_t& p = g.square(square_idx)[particle_in_square_idx];
     particle_in_square_idx++;
-    if (particle_in_square_idx >= g.squares[square_idx].size()) {
-      if (grid_squares_iterator.hasNext()) {
-        square_idx = grid_squares_iterator.next();
+    while (particle_in_square_idx >= g.square(square_idx).size()) {
+      if (grid_squares_iterator->hasNext()) {
+        square_idx = grid_squares_iterator->next();
         particle_in_square_idx = 0;
       } else {
         has_finished = true;
+        break;
       }
     }
     return p;
@@ -82,6 +93,7 @@ public:
  */
 class GridNeighborSquaresIterator : public SimpleIterator<int> {
 private:
+  const Grid& g;
   // The following invariant is maintained: (current_square_x, current_square_y)
   // is within the bounding box defined by the following edge coordinates, OR
   // hasNext() is false.
@@ -89,17 +101,16 @@ private:
   const int left_edge_y;
   const int bottom_edge_x;
   const int right_edge_y;
-  const Grid& g;
   int current_square_x;
   int current_square_y;
 
 public:
   GridNeighborSquaresIterator(const Grid& g_v, int square_x, int square_y):
+      g(g_v),
       top_edge_x(max(square_x-1, 0)),
       left_edge_y(max(square_y-1, 0)),
       bottom_edge_x(min(square_x+1, g.num_squares_per_side)),
       right_edge_y(min(square_y+1, g.num_squares_per_side)),
-      g(g_v),
       current_square_x(top_edge_x),
       current_square_y(left_edge_y) { }
   ~GridNeighborSquaresIterator() { }
@@ -112,7 +123,7 @@ public:
     }
     return current_square_idx;
   }
-  bool hasNext() const {
+  bool hasNext() {
     return current_square_y < right_edge_y;
   }
 };
@@ -123,26 +134,23 @@ Grid::Grid(double side_length_v, int num_squares_per_side_v):
     num_squares_per_side(num_squares_per_side_v),
     square_length(side_length_v / num_squares_per_side_v),
     num_squares(num_squares_per_side*num_squares_per_side),
-    squares(new std::vector<particle_t*>[num_squares_per_side*num_squares_per_side]) {
+    squares(std::unique_ptr<std::vector<Square> >(new std::vector<Square>(num_squares_per_side*num_squares_per_side))) {
 }
 
 Grid::Grid(double side_length_v, int num_squares_per_side_v, int num_particles, particle_t* particles):
     Grid::Grid(side_length_v, num_squares_per_side_v) {
   for (int particle_idx = 0; particle_idx < num_particles; particle_idx++) {
-    particle_t* p = &particles[particle_idx];
-    squares[flat_idx(*p)].push_back(p);
+    particle_t& p = particles[particle_idx];
+    square(flat_idx(p)).push_back(p);
   }
 }
 
-Grid::~Grid() {
-  //FIXME: Still not really sure how this works in C++.
-  delete squares;
-}
+Grid::~Grid() { }
 
-SimpleIterator<particle_t&>& Grid::neighbor_iterator(const particle_t& p) const {
+std::unique_ptr<SimpleIterator<particle_t&> > Grid::neighbor_iterator(const particle_t& p) const {
   //FIXME: Not sure whether it's idiomatic to use the heap here.  There is a
   // memory leak.
-  SimpleIterator<int>* neighbor_squares = new GridNeighborSquaresIterator(*this, square_x(p.x), square_y(p.y));
-  SimpleIterator<particle_t&>* neighbor_particles = new ParticleIterator(*this, *neighbor_squares);
-  return *neighbor_particles;
+  return std::unique_ptr<SimpleIterator<particle_t&> >(new ParticleIterator(
+      *this,
+      std::unique_ptr<SimpleIterator<int> >(new GridNeighborSquaresIterator(*this, square_x(p.x), square_y(p.y)))));
 }

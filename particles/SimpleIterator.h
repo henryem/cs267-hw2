@@ -13,9 +13,9 @@
  * collections.
  *
  * The standard iteration idiom is:
- *   SimpleIterator<Foo> i = ...;
- *   while (i.hasNext()) {
- *     Foo& f = i.next();
+ *   unique_ptr<SimpleIterator<Foo> > i = ...;
+ *   while (i->hasNext()) {
+ *     Foo f = i->next();
  *     ...
  *   }
  *   delete i; // (if necessary)
@@ -24,8 +24,8 @@ template <typename T>
 class SimpleIterator {
 public:
   virtual ~SimpleIterator() = 0;
-  /* True if there is a value to get. */
-  virtual bool hasNext() const = 0;
+  /* True if there is a value to get.  Logically const. */
+  virtual bool hasNext() = 0;
   /* Returns the current value and advances the iterator.  It is an error to
    * call next() if hasNext() is false. */
   virtual T next() = 0;
