@@ -29,6 +29,8 @@ public:
 
   particle_t(double x_v, double y_v, double vx_v, double vy_v, double ax_v, double ay_v):
     x(x_v), y(y_v), vx(vx_v), vy(vy_v), ax(ax_v), ay(ay_v) { }
+  particle_t(double x_v, double y_v):
+      x(x_v), y(y_v), vx(0.0), vy(0.0), ax(0.0), ay(0.0) { }
 };
 
 //

@@ -64,6 +64,7 @@ public:
         }
       }
       // No grid squares had elements.
+      has_finished = true;
       return false;
     } else {
       return true;
@@ -71,7 +72,7 @@ public:
   }
 
   particle_t& next() {
-    particle_t& p = g.square(square_idx)[particle_in_square_idx];
+    particle_t* p = g.square(square_idx)[particle_in_square_idx];
     particle_in_square_idx++;
     while (particle_in_square_idx >= g.square(square_idx).size()) {
       if (grid_squares_iterator->hasNext()) {
@@ -82,7 +83,7 @@ public:
         break;
       }
     }
-    return p;
+    return *p;
   }
 };
 
@@ -96,7 +97,8 @@ private:
   const Grid& g;
   // The following invariant is maintained: (current_square_x, current_square_y)
   // is within the bounding box defined by the following edge coordinates, OR
-  // hasNext() is false.
+  // hasNext() is false.  The bounding box is top- and left-inclusive and bottom-
+  // and right-exclusive.
   const int top_edge_x;
   const int left_edge_y;
   const int bottom_edge_x;
@@ -109,15 +111,15 @@ public:
       g(g_v),
       top_edge_x(max(square_x-1, 0)),
       left_edge_y(max(square_y-1, 0)),
-      bottom_edge_x(min(square_x+1, g.num_squares_per_side)),
-      right_edge_y(min(square_y+1, g.num_squares_per_side)),
+      bottom_edge_x(min(square_x+2, g.num_squares_per_side)),
+      right_edge_y(min(square_y+2, g.num_squares_per_side)),
       current_square_x(top_edge_x),
       current_square_y(left_edge_y) { }
   ~GridNeighborSquaresIterator() { }
   int next() {
     const int current_square_idx = g.square_idx_to_flat_idx(current_square_x, current_square_y);
     current_square_x++;
-    if (current_square_x > bottom_edge_x) {
+    if (current_square_x >= bottom_edge_x) {
       current_square_x = top_edge_x;
       current_square_y++;
     }
@@ -141,16 +143,16 @@ Grid::Grid(double side_length_v, int num_squares_per_side_v, int num_particles, 
     Grid::Grid(side_length_v, num_squares_per_side_v) {
   for (int particle_idx = 0; particle_idx < num_particles; particle_idx++) {
     particle_t& p = particles[particle_idx];
-    square(flat_idx(p)).push_back(p);
+    square(flat_idx(p)).push_back(&p);
   }
 }
 
 Grid::~Grid() { }
 
 std::unique_ptr<SimpleIterator<particle_t&> > Grid::neighbor_iterator(const particle_t& p) const {
-  //FIXME: Not sure whether it's idiomatic to use the heap here.  There is a
-  // memory leak.
+  int x = square_x(p.x);
+  int y = square_y(p.y);
   return std::unique_ptr<SimpleIterator<particle_t&> >(new ParticleIterator(
       *this,
-      std::unique_ptr<SimpleIterator<int> >(new GridNeighborSquaresIterator(*this, square_x(p.x), square_y(p.y)))));
+      std::unique_ptr<SimpleIterator<int> >(new GridNeighborSquaresIterator(*this, x, y))));
 }

@@ -18,7 +18,7 @@ private:
   //TODO: Should be a vector of weak_ptr<particle_t>, but that seems a little
   // complicated, so I'm punting for now.  This class does not own the
   // particles.
-  typedef std::vector<particle_t> Square;
+  typedef std::vector<particle_t*> Square;
   const double side_length;
   const int num_squares_per_side;
   const double square_length;
@@ -29,10 +29,16 @@ private:
     return flat_idx(p.x, p.y);
   }
   inline int square_x(double x) const {
-    return (int) x / square_length;
+    return (int) (x / square_length);
+  }
+  inline int square_x(const particle_t& p) const {
+    return (int) (p.x / square_length);
   }
   inline int square_y(double y) const {
-    return (int) y / square_length;
+    return (int) (y / square_length);
+  }
+  inline int square_y(const particle_t& p) const {
+    return (int) (p.y / square_length);
   }
   // The flat index of the grid square containing point (x,y).  x is the distance
   // from the top edge of the grid and y is the distance from the left.
@@ -42,7 +48,7 @@ private:
   inline int square_idx_to_flat_idx(int square_x, int square_y) const {
     return square_x + square_y*num_squares_per_side;
   }
-  inline Square square(int square_idx) const {
+  inline Square& square(int square_idx) const {
     return (*squares)[square_idx];
   }
 public:

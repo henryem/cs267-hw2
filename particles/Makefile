@@ -45,17 +45,17 @@ TARGETS = serial pthreads autograder tests
 all:	$(TARGETS)
 
 tests: tests.o Grid.o
-	$(CC) -o $@ tests.o Grid.o $(LIBS)
+	$(CC) $(CFLAGS) -o $@ tests.o Grid.o $(LIBS)
 serial: serial.o $(OWN_LIBS)
-	$(CC) -o $@ $^ $(LIBS)
+	$(CC) $(CFLAGS) -o $@ $^ $(LIBS)
 autograder: autograder.o $(OWN_LIBS)
-	$(CC) -o $@ $^ $(LIBS)
+	$(CC) $(CFLAGS) -o $@ $^ $(LIBS)
 pthreads: pthreads.o $(OWN_LIBS)
-	$(CC) -o $@ $^ $(LIBS) -lpthread
+	$(CC) $(CFLAGS) -o $@ $^ $(LIBS) -lpthread
 # openmp: openmp.o $(OWN_LIBS)
-# 	$(CC) -o $@ $^ $(LIBS) $(OPENMP)
+# 	$(CC) $(CFLAGS) -o $@ $^ $(LIBS) $(OPENMP)
 # mpi: mpi.o common.o
-# 	$(MPCC) -o $@ $^ $(LIBS) $(MPILIBS)
+# 	$(MPCC) $(CFLAGS) -o $@ $^ $(LIBS) $(MPILIBS)
 
 pthread_barrier.o: pthread_barrier.cpp pthread_barrier.h
 	$(CC) -c $(CFLAGS) $<

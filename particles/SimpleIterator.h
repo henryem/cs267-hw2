@@ -29,6 +29,16 @@ public:
   /* Returns the current value and advances the iterator.  It is an error to
    * call next() if hasNext() is false. */
   virtual T next() = 0;
+  /* The number of elements left in this iterator.  Calling this exhausts
+   * the iterator, so usually it should be called on a deep copy. */
+  int size() {
+    int num_elements = 0;
+    while (hasNext()) {
+      next();
+      num_elements++;
+    }
+    return num_elements;
+  }
 };
 
 template <typename T>

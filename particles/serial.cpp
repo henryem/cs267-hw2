@@ -12,6 +12,7 @@ void simulate_step(int num_particles, particle_t* particles, double size, int nu
   //
   //  compute forces
   //
+  int num_neighbors_seen = 0;
   for( int i = 0; i < num_particles; i++ ) {
     particle_t& p = particles[i];
     p.ax = p.ay = 0;
@@ -19,6 +20,7 @@ void simulate_step(int num_particles, particle_t* particles, double size, int nu
     while (neighbors->hasNext()) {
       particle_t& neighbor = neighbors->next();
       apply_force(p, neighbor, step_stats);
+      num_neighbors_seen++;
     }
   }
 
@@ -53,7 +55,7 @@ int main( int argc, char **argv ) {
   }
   
   int n = read_int( argc, argv, "-n", 1000 );
-  bool fast = (find_option( argc, argv, "-no" ) == -1);
+  bool fast = (find_option( argc, argv, "-no" ) != -1);
 
   char *savename = read_string( argc, argv, "-o", NULL );
   char *sumname = read_string( argc, argv, "-s", NULL );
@@ -70,6 +72,7 @@ int main( int argc, char **argv ) {
   // and proportional to the area.  So this is just a constant.
   const double grid_square_size = sqrt(0.0005) + 0.000001;
   const int num_grid_squares_per_side = size / grid_square_size;
+  printf("Using %d grid squares of side-length %f for %d particles.\n", num_grid_squares_per_side*num_grid_squares_per_side, grid_square_size, n);
   init_particles( n, particles );
   
   //
