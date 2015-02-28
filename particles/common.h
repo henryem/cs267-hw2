@@ -1,6 +1,8 @@
 #ifndef __CS267_COMMON_H__
 #define __CS267_COMMON_H__
 
+#include <memory>
+#include <vector>
 #include <stdio.h>
 #include "Stats.h"
 
@@ -27,10 +29,14 @@ public:
   double ax;
   double ay;
 
+  particle_t():
+      x(0.0), y(0.0), vx(0.0), vy(0.0), ax(0.0), ay(0.0) { }
   particle_t(double x_v, double y_v, double vx_v, double vy_v, double ax_v, double ay_v):
-    x(x_v), y(y_v), vx(vx_v), vy(vy_v), ax(ax_v), ay(ay_v) { }
+      x(x_v), y(y_v), vx(vx_v), vy(vy_v), ax(ax_v), ay(ay_v) { }
   particle_t(double x_v, double y_v):
       x(x_v), y(y_v), vx(0.0), vy(0.0), ax(0.0), ay(0.0) { }
+  particle_t(const particle_t& p):
+      x(p.x), y(p.y), vx(p.vx), vy(p.vy), ax(p.ax), ay(p.ay) { }
 };
 
 //
@@ -41,8 +47,8 @@ double read_timer( );
 //
 //  simulation routines
 //
-double set_size( int n );
-void init_particles( int n, particle_t *p );
+double set_size(int n);
+std::unique_ptr<std::vector<particle_t>> init_particles(int n);
 void apply_force( particle_t &particle, particle_t &neighbor, Stats &stats);
 void move( particle_t &p );
 

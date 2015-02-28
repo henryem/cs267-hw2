@@ -139,10 +139,10 @@ Grid::Grid(double side_length_v, int num_squares_per_side_v):
     squares(std::unique_ptr<std::vector<Square> >(new std::vector<Square>(num_squares_per_side*num_squares_per_side))) {
 }
 
-Grid::Grid(double side_length_v, int num_squares_per_side_v, int num_particles, particle_t* particles):
+Grid::Grid(double side_length_v, int num_squares_per_side_v, std::vector<particle_t> particles):
     Grid::Grid(side_length_v, num_squares_per_side_v) {
-  for (int particle_idx = 0; particle_idx < num_particles; particle_idx++) {
-    particle_t& p = particles[particle_idx];
+  for (std::vector<particle_t>::iterator i = particles.begin(); i != particles.end(); i++) {
+    particle_t& p = *i;
     square(flat_idx(p)).push_back(&p);
   }
 }

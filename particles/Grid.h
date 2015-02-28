@@ -53,7 +53,7 @@ private:
   }
 public:
   Grid(double side_length, int num_squares_per_side);
-  Grid(double side_length, int num_squares_per_side, int num_particles, particle_t* particles);
+  Grid(double side_length, int num_squares_per_side, std::vector<particle_t> particles);
   ~Grid();
   /* An iterator over particles in the same grid-square as @p or a bordering
    * square.

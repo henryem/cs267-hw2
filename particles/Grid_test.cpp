@@ -2,7 +2,7 @@
 
 SCENARIO( "Adding and moving items in a grid", "[grid]" ) {
   GIVEN("An empty grid") {
-    Grid g(1.0, 1, 0, nullptr);
+    Grid g(1.0, 1, std::vector<particle_t>(0));
     WHEN("we iterate over particles near some particle") {
       std::unique_ptr<SimpleIterator<particle_t&> > i = g.neighbor_iterator(particle_t(0.5, 0.5));
       THEN("there are none") {
@@ -12,8 +12,8 @@ SCENARIO( "Adding and moving items in a grid", "[grid]" ) {
   }
 
   GIVEN("A 1x1 grid with a few elements") {
-    particle_t ps[2] = {particle_t(0.2, 0.2), particle_t(0.3, 0.3)};
-    Grid g(1.0, 1, 2, ps);
+    std::vector<particle_t> ps = {particle_t(0.2, 0.2), particle_t(0.3, 0.3)};
+    Grid g(1.0, 1, ps);
     WHEN("we iterate over particles near some particle") {
       std::unique_ptr<SimpleIterator<particle_t&> > i = g.neighbor_iterator(particle_t(0.5, 0.5));
       THEN("we see all the particles") {
@@ -38,8 +38,8 @@ SCENARIO( "Adding and moving items in a grid", "[grid]" ) {
   }
 
   GIVEN("A 2x2 grid with a few elements, and no elements in one square") {
-    particle_t ps[4] = {particle_t(0.2, 0.2), particle_t(0.3, 0.3), particle_t(0.8, 0.8), particle_t(0.8, 0.3)};
-    Grid g(1.0, 2, 4, ps);
+    std::vector<particle_t> ps = {particle_t(0.2, 0.2), particle_t(0.3, 0.3), particle_t(0.8, 0.8), particle_t(0.8, 0.3)};
+    Grid g(1.0, 2, ps);
     WHEN("we iterate over particles near some particle") {
       std::unique_ptr<SimpleIterator<particle_t&> > i = g.neighbor_iterator(particle_t(0.5, 0.5));
       THEN("we see all the particles") {
@@ -54,7 +54,7 @@ SCENARIO( "Adding and moving items in a grid", "[grid]" ) {
   }
 
   GIVEN("A 3x3 grid with a few elements in each square") {
-    particle_t ps[9] = {
+    std::vector<particle_t> ps = {
         particle_t(0.5, 0.5),
         particle_t(1.5, 0.5),
         particle_t(2.5, 0.5),
@@ -65,7 +65,7 @@ SCENARIO( "Adding and moving items in a grid", "[grid]" ) {
         particle_t(1.5, 2.5),
         particle_t(2.5, 2.5),
     };
-    Grid g(3.0, 3, 9, ps);
+    Grid g(3.0, 3, ps);
     WHEN("we iterate over particles near a top-left particle") {
       std::unique_ptr<SimpleIterator<particle_t&> > i = g.neighbor_iterator(particle_t(0.5, 0.5));
       THEN("we see 4 particles") {
@@ -85,7 +85,7 @@ SCENARIO( "Adding and moving items in a grid", "[grid]" ) {
     }
 
     GIVEN("A 5x5 grid with an element in each square") {
-      particle_t ps[25] = {
+      std::vector<particle_t> ps = {
           particle_t(0.5, 0.5),
           particle_t(1.5, 0.5),
           particle_t(2.5, 0.5),
@@ -112,7 +112,7 @@ SCENARIO( "Adding and moving items in a grid", "[grid]" ) {
           particle_t(3.5, 4.5),
           particle_t(4.5, 4.5),
       };
-      Grid g(5.0, 5, 25, ps);
+      Grid g(5.0, 5, ps);
       WHEN("we iterate over particles near the middle") {
         std::unique_ptr<SimpleIterator<particle_t&> > i = g.neighbor_iterator(particle_t(2.5, 2.5));
         THEN("we see 9 particles") {

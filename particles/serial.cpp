@@ -6,35 +6,33 @@
 #include "Grid.h"
 #include "SimpleIterator.h"
 
-void simulate_step(int num_particles, particle_t* particles, double size, int num_grid_squares_per_side, Stats &s, FILE *fsave, bool fast, bool save_output) {
+void simulate_step(std::vector<particle_t>& particles, double size, int num_grid_squares_per_side, Stats &s, FILE *fsave, bool fast, bool save_output) {
   Stats step_stats;
-  Grid g(size, num_grid_squares_per_side, num_particles, particles);
+  Grid g(size, num_grid_squares_per_side, particles);
   //
   //  compute forces
   //
-  int num_neighbors_seen = 0;
-  for( int i = 0; i < num_particles; i++ ) {
-    particle_t& p = particles[i];
+  for (std::vector<particle_t>::iterator i = particles.begin(); i != particles.end(); i++) {
+    particle_t& p = *i;
     p.ax = p.ay = 0;
     std::unique_ptr<SimpleIterator<particle_t&> > neighbors = g.neighbor_iterator(p);
     while (neighbors->hasNext()) {
       particle_t& neighbor = neighbors->next();
       apply_force(p, neighbor, step_stats);
-      num_neighbors_seen++;
     }
   }
 
   //
   //  move particles
   //
-  for( int i = 0; i < num_particles; i++ ) {
-    move( particles[i] );
+  for (std::vector<particle_t>::iterator i = particles.begin(); i != particles.end(); i++) {
+    move(*i);
   }
 
   if (!fast) {
     s.aggregate_left(step_stats);
     if (save_output) {
-      save(fsave, num_particles, particles);
+      save(fsave, particles.size(), particles.data());
     }
   }
 }
@@ -64,7 +62,6 @@ int main( int argc, char **argv ) {
   FILE *fsum = sumname ? fopen ( sumname, "a" ) : NULL;
 
   Stats overall_stats;
-  particle_t *particles = (particle_t*) malloc( n * sizeof(particle_t) );
   const double size = set_size( n );
   // We need to set the size of a grid square so that the average number of
   // particles per grid square is constant.  The simulation already ensures
@@ -73,7 +70,7 @@ int main( int argc, char **argv ) {
   const double grid_square_size = sqrt(0.0005) + 0.000001;
   const int num_grid_squares_per_side = size / grid_square_size;
   printf("Using %d grid squares of side-length %f for %d particles.\n", num_grid_squares_per_side*num_grid_squares_per_side, grid_square_size, n);
-  init_particles( n, particles );
+  std::unique_ptr<std::vector<particle_t> > particles = init_particles(n);
   
   //
   //  simulate a number of time steps
@@ -81,7 +78,7 @@ int main( int argc, char **argv ) {
   double simulation_time = read_timer( );
 
   for( int step = 0; step < NSTEPS; step++ ) {
-    simulate_step(n, particles, size, num_grid_squares_per_side, overall_stats, fsave, fast, fsave && (step%SAVEFREQ) == 0);
+    simulate_step(*(particles.get()), size, num_grid_squares_per_side, overall_stats, fsave, fast, fsave && (step%SAVEFREQ) == 0);
   }
   simulation_time = read_timer( ) - simulation_time;
   
@@ -113,7 +110,6 @@ int main( int argc, char **argv ) {
   if( fsum ) {
     fclose(fsum);
   }
-  free(particles);
   if (fsave) {
     fclose(fsave);
   }
