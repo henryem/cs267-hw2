@@ -38,6 +38,7 @@ endif
 LIBS = -lstdc++
 
 OWN_LIBS = common.o Grid.o Stats.o $(OWN_PTHREAD_BARRIER_LIB)
+OWN_OMP_LIBS = $(OWN_LIBS) OmpThreadsafeGrid.o
 
 TARGETS = serial autograder tests openmp
 #pthreads mpi
@@ -52,7 +53,7 @@ autograder: autograder.o $(OWN_LIBS)
 	$(CC) $(CFLAGS) -o $@ $^ $(LIBS)
 pthreads: pthreads.o $(OWN_LIBS)
 	$(CC) $(CFLAGS) -o $@ $^ $(LIBS) -lpthread
-openmp: openmp.o $(OWN_LIBS)
+openmp: openmp.o $(OWN_OMP_LIBS)
 	$(CC) $(CFLAGS) -o $@ $^ $(LIBS) $(OPENMP)
 mpi: mpi.o common.o
 	$(MPCC) $(CFLAGS) -o $@ $^ $(LIBS) $(MPILIBS)
@@ -61,7 +62,7 @@ pthread_barrier.o: pthread_barrier.cpp pthread_barrier.h
 	$(CC) -c $(CFLAGS) $<
 autograder.o: autograder.cpp $(OWN_LIBS)
 	$(CC) -c $(CFLAGS) $<
-openmp.o: openmp.cpp $(OWN_LIBS)
+openmp.o: openmp.cpp $(OWN_OMP_LIBS)
 	$(CC) -c $(OPENMP) $(CFLAGS) $<
 serial.o: serial.cpp $(OWN_LIBS)
 	$(CC) -c $(CFLAGS) $<
@@ -71,8 +72,8 @@ mpi.o: mpi.cpp $(OWN_LIBS)
 	$(MPCC) -c $(CFLAGS) $<
 common.o: common.cpp common.h Stats.h
 	$(CC) -c $(CFLAGS) $<
-Stats.o: Stats.cpp Stats.h
-	$(CC) -c $(CFLAGS) $<
+OmpThreadsafeGrid.o: OmpThreadsafeGrid.cpp OmpThreadsafeGrid.h
+	$(CC) -c $(OPENMP) $(CFLAGS) $<
 tests.o: tests.cpp Grid_test.cpp Grid.h catch.hpp
 	$(CC) -c $(CFLAGS) $<
 %.o: %.cpp %.h

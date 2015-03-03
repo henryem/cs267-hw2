@@ -11,10 +11,13 @@ class ParticleIterator;
 
 class GridNeighborSquaresIterator;
 
+class RangeIterator;
+
 class Grid {
-private:
+protected:
   friend class ParticleIterator;
   friend class GridNeighborSquaresIterator;
+  friend class RangeIterator;
   //TODO: Should be a vector of weak_ptr<particle_t>, but that seems a little
   // complicated, so I'm punting for now.  This class does not own the
   // particles.
@@ -53,12 +56,23 @@ private:
   }
 public:
   Grid(double side_length, int num_squares_per_side);
-  Grid(double side_length, int num_squares_per_side, std::vector<particle_t> particles);
-  ~Grid();
+  Grid(double side_length, int num_squares_per_side, std::vector<particle_t>& particles);
+  virtual ~Grid();
   /* An iterator over particles in the same grid-square as @p or a bordering
    * square.
    */
   std::unique_ptr<SimpleIterator<particle_t&> > neighbor_iterator(const particle_t& p) const;
+  /* An iterator over particles in subgrid @subgrid_idx out of @num_subgrids
+   * total subgrids.  It is guaranteed that the disjoint union of subgrid(0, k),
+   * subgrid(1, k), ..., subgrid(k-1, k) equals the set of particles in the
+   * grid.  Beyond that, subclasses may divide themselves arbitrarily but
+   * should attempt to create contiguous subgrids with small average surface
+   * area (e.g. O(sqrt(subgrid size))).
+   */
+  std::unique_ptr<SimpleIterator<particle_t&> > subgrid(int subgrid_idx, int num_subgrids) const;
+  /* Add @p to the grid.  Subclasses may define different thread-safety
+   * semantics for this method. */
+  virtual void add(particle_t& p);
 };
 
 #endif /* GRID_H_ */

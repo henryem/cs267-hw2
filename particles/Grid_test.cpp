@@ -2,7 +2,8 @@
 
 SCENARIO( "Adding and moving items in a grid", "[grid]" ) {
   GIVEN("An empty grid") {
-    Grid g(1.0, 1, std::vector<particle_t>(0));
+    std::vector<particle_t> ps(0);
+    Grid g(1.0, 1, ps);
     WHEN("we iterate over particles near some particle") {
       std::unique_ptr<SimpleIterator<particle_t&> > i = g.neighbor_iterator(particle_t(0.5, 0.5));
       THEN("there are none") {

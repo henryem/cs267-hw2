@@ -31,7 +31,7 @@ private:
   // Uninitialized until has_started is true.  Nonsense if has_finished is
   // true.
   // The index of the next particle that will be returned.
-  int particle_in_square_idx;
+  unsigned int particle_in_square_idx;
   bool has_started;
   bool has_finished;
 
@@ -130,6 +130,21 @@ public:
   }
 };
 
+class RangeIterator : public SimpleIterator<int> {
+private:
+  int current;
+  int end;
+public:
+  /* Inclusive on the left, exclusive on the right. */
+  RangeIterator(int start, int end_v): current(start), end(end_v) { }
+  int next() {
+    return current++;
+  }
+  bool hasNext() {
+    return current < end;
+  }
+};
+
 
 Grid::Grid(double side_length_v, int num_squares_per_side_v):
     side_length(side_length_v),
@@ -139,11 +154,11 @@ Grid::Grid(double side_length_v, int num_squares_per_side_v):
     squares(std::unique_ptr<std::vector<Square> >(new std::vector<Square>(num_squares_per_side*num_squares_per_side))) {
 }
 
-Grid::Grid(double side_length_v, int num_squares_per_side_v, std::vector<particle_t> particles):
+Grid::Grid(double side_length_v, int num_squares_per_side_v, std::vector<particle_t>& particles):
     Grid::Grid(side_length_v, num_squares_per_side_v) {
   for (std::vector<particle_t>::iterator i = particles.begin(); i != particles.end(); i++) {
     particle_t& p = *i;
-    square(flat_idx(p)).push_back(&p);
+    add(p);
   }
 }
 
@@ -155,4 +170,20 @@ std::unique_ptr<SimpleIterator<particle_t&> > Grid::neighbor_iterator(const part
   return std::unique_ptr<SimpleIterator<particle_t&> >(new ParticleIterator(
       *this,
       std::unique_ptr<SimpleIterator<int> >(new GridNeighborSquaresIterator(*this, x, y))));
+}
+
+std::unique_ptr<SimpleIterator<particle_t&> > Grid::subgrid(int subgrid_idx, int num_subgrids) const {
+  //TODO: For now just returns a range of subblocks according to column-major
+  // order.  This makes the surface area bigger, resulting in more
+  // communication when this is used as a blocking structure.
+  int num_squares_per_subgrid = div_round_up(num_squares, num_subgrids);
+  int start = subgrid_idx * num_squares_per_subgrid;
+  int end = min(start + num_squares_per_subgrid, num_squares);
+  return std::unique_ptr<SimpleIterator<particle_t&> >(new ParticleIterator(
+      *this,
+      std::unique_ptr<SimpleIterator<int> >(new RangeIterator(start, end))));
+}
+
+void Grid::add(particle_t& p) {
+  square(flat_idx(p)).push_back(&p);
 }

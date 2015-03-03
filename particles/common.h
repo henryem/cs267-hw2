@@ -10,6 +10,7 @@ inline int min( int a, int b ) { return a < b ? a : b; }
 inline double min( double a, double b ) { return a < b ? a : b; }
 inline int max( int a, int b ) { return a > b ? a : b; }
 inline double max( double a, double b ) { return a > b ? a : b; }
+inline int div_round_up(int dividend, int divisor) { return (dividend - 1 + divisor) / divisor; }
 
 //
 //  saving parameters
@@ -35,8 +36,6 @@ public:
       x(x_v), y(y_v), vx(vx_v), vy(vy_v), ax(ax_v), ay(ay_v) { }
   particle_t(double x_v, double y_v):
       x(x_v), y(y_v), vx(0.0), vy(0.0), ax(0.0), ay(0.0) { }
-  particle_t(const particle_t& p):
-      x(p.x), y(p.y), vx(p.vx), vy(p.vy), ax(p.ax), ay(p.ay) { }
 };
 
 //
