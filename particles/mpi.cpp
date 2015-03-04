@@ -3,6 +3,8 @@
 #include <stdio.h>
 #include <assert.h>
 #include "common.h"
+#include "SimpleIterator.h"
+#include "Grid.h"
 
 //
 //  benchmarking program
@@ -28,10 +30,24 @@ int main( int argc, char **argv )
         return 0;
     }
     
-    int n = read_int( argc, argv, "-n", 1000 );
-    char *savename = read_string( argc, argv, "-o", NULL );
-    char *sumname = read_string( argc, argv, "-s", NULL );
-    
+    const int n = read_int( argc, argv, "-n", 1000 );
+    const bool fast = (find_option( argc, argv, "-no" ) != -1);
+    const char *savename = read_string( argc, argv, "-o", NULL );
+    const char *sumname = read_string( argc, argv, "-s", NULL );
+    const int num_threads_override = read_int( argc, argv, "-p", 0);
+
+
+    const double size = set_size( n );
+    // We need to set the size of a grid square so that the average number of
+    // particles per grid square is constant.  The simulation already ensures
+    // that the average number of particles in an arbitrary region is constant
+    // and proportional to the area.  So this is just a constant.
+    const double grid_square_size = sqrt(0.0005) + 0.000001;
+    const int num_grid_squares_per_side = size / grid_square_size;
+    printf("Using %d grid squares of side-length %f for %d particles.\n", num_grid_squares_per_side*num_grid_squares_per_side, grid_square_size, n);
+    std::unique_ptr<std::vector<particle_t> > particles = init_particles(n);
+
+
     //
     //  set up MPI
     //

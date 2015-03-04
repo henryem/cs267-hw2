@@ -33,3 +33,7 @@ pthreads
 openmp
 serial
 tests
+
+particles/openmp.txt
+
+particles/serial.txt
