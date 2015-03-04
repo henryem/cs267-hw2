@@ -14,34 +14,34 @@ ifneq ($(shell uname -a | grep Ubuntu),)
 endif
 ifneq ($(shell uname -a | grep Darwin),)
   RAW_CC = g++-4.9 -Wall -std=c++0x
-	OPENMP = -fopenmp
-	RAW_MPCC = OMPI_MPICXX=$(RAW_CC) mpic++
+  OPENMP = -fopenmp
+  RAW_MPCC = OMPI_MPICXX="$(RAW_CC)" mpic++
   FLAGS = -DCUSTOM_PTHREAD_BARRIER=1
-	OWN_PTHREAD_BARRIER_LIB = pthread_barrier.o
+  OWN_PTHREAD_BARRIER_LIB = pthread_barrier.o
   OSFOUND=1
 endif
 ifneq ($(shell uname -a | grep hopper),)
   HOPPER = 1
   RAW_CC = cc -Wall
-	OPENMP = -mp
-	RAW_MPCC = $(RAW_CC)
+  OPENMP = -mp
+  RAW_MPCC = $(RAW_CC)
   OSFOUND=1
 endif
 
 CC = $(RAW_CC) $(FLAGS)
 MPCC = $(RAW_MPCC) $(FLAGS)
 ifdef DEBUG
-	CFLAGS = -O0 -g -pg
+  CFLAGS = -O0 -g -pg
 else
-	CFLAGS = -O3
+  CFLAGS = -O3
 endif
 LIBS = -lstdc++
 
 OWN_LIBS = common.o Grid.o Stats.o $(OWN_PTHREAD_BARRIER_LIB)
 OWN_OMP_LIBS = $(OWN_LIBS) OmpThreadsafeGrid.o
 
-TARGETS = serial autograder tests openmp
-#pthreads mpi
+TARGETS = serial autograder tests openmp mpi
+#pthreads
 
 all:	$(TARGETS)
 
@@ -55,7 +55,7 @@ pthreads: pthreads.o $(OWN_LIBS)
 	$(CC) $(CFLAGS) -o $@ $^ $(LIBS) -lpthread
 openmp: openmp.o $(OWN_OMP_LIBS)
 	$(CC) $(CFLAGS) -o $@ $^ $(LIBS) $(OPENMP)
-mpi: mpi.o common.o
+mpi: mpi.o $(OWN_LIBS)
 	$(MPCC) $(CFLAGS) -o $@ $^ $(LIBS) $(MPILIBS)
 
 pthread_barrier.o: pthread_barrier.cpp pthread_barrier.h

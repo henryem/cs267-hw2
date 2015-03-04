@@ -5,17 +5,21 @@
 #include "common.h"
 #include "SimpleIterator.h"
 #include "Grid.h"
+#include "Stats.h"
+
+void add_stats(void *invec, void *inoutvec, int *len, MPI_Datatype *datatype) {
+  Stats* in = (Stats *) invec;
+  Stats* out = (Stats *) inoutvec;
+  for (int i = 0; i < *len; i++) {
+    out[i].aggregate_left(in[i]);
+  }
+}
 
 //
 //  benchmarking program
 //
 int main( int argc, char **argv )
-{    
-    int navg, nabsavg=0;
-    double dmin, absmin=1.0,davg,absavg=0.0;
-    double rdavg,rdmin;
-    int rnavg; 
- 
+{
     //
     //  process command line parameters
     //
@@ -34,7 +38,6 @@ int main( int argc, char **argv )
     const bool fast = (find_option( argc, argv, "-no" ) != -1);
     const char *savename = read_string( argc, argv, "-o", NULL );
     const char *sumname = read_string( argc, argv, "-s", NULL );
-    const int num_threads_override = read_int( argc, argv, "-p", 0);
 
 
     const double size = set_size( n );
@@ -44,9 +47,6 @@ int main( int argc, char **argv )
     // and proportional to the area.  So this is just a constant.
     const double grid_square_size = sqrt(0.0005) + 0.000001;
     const int num_grid_squares_per_side = size / grid_square_size;
-    printf("Using %d grid squares of side-length %f for %d particles.\n", num_grid_squares_per_side*num_grid_squares_per_side, grid_square_size, n);
-    std::unique_ptr<std::vector<particle_t> > particles = init_particles(n);
-
 
     //
     //  set up MPI
@@ -63,12 +63,27 @@ int main( int argc, char **argv )
     FILE *fsum = sumname && rank == 0 ? fopen ( sumname, "a" ) : NULL;
 
 
-    particle_t *particles = (particle_t*) malloc( n * sizeof(particle_t) );
+    particle_t *particles = (particle_t*) malloc(n*sizeof(particle_t));
     
+    // Create an MPI type for particle_t.
     MPI_Datatype PARTICLE;
     MPI_Type_contiguous( 6, MPI_DOUBLE, &PARTICLE );
     MPI_Type_commit( &PARTICLE );
     
+    // Create an MPI type and aggregation function for Stats.
+    MPI_Datatype STATS;
+    MPI_Datatype STATS_TYPES[3] = {MPI_DOUBLE, MPI_DOUBLE, MPI_INT};
+    int STATS_BLOCKLENS[3] = {1, 1, 1};
+    MPI_Aint STATS_DISPLACEMENTS[3];
+    STATS_DISPLACEMENTS[0] = offsetof(Stats, min);
+    STATS_DISPLACEMENTS[1] = offsetof(Stats, avg);
+    STATS_DISPLACEMENTS[2] = offsetof(Stats, n);
+    MPI_Type_create_struct(3, STATS_BLOCKLENS, STATS_DISPLACEMENTS, STATS_TYPES, &STATS);
+    MPI_Type_commit(&STATS);
+
+    MPI_Op ADD_STATS;
+    MPI_Op_create(add_stats, 1, &ADD_STATS);
+
     //
     //  set up the data partitioning across processors
     //
@@ -91,19 +106,20 @@ int main( int argc, char **argv )
     //  initialize and distribute the particles (that's fine to leave it unoptimized)
     //
     set_size( n );
-    if( rank == 0 )
-        init_particles( n, particles );
+    if( rank == 0 ) {
+        particles = init_particles(n).release()->data();
+    }
     MPI_Scatterv( particles, partition_sizes, partition_offsets, PARTICLE, local, nlocal, PARTICLE, 0, MPI_COMM_WORLD );
     
+    Stats local_stats;
+    Stats global_stats;
+
     //
     //  simulate a number of time steps
     //
     double simulation_time = read_timer( );
     for( int step = 0; step < NSTEPS; step++ )
     {
-        navg = 0;
-        dmin = 1.0;
-        davg = 0.0;
         // 
         //  collect all global data locally (not good idea to do)
         //
@@ -112,7 +128,7 @@ int main( int argc, char **argv )
         //
         //  save current step if necessary (slightly different semantics than in other codes)
         //
-        if( find_option( argc, argv, "-no" ) == -1 )
+        if(!fast)
           if( fsave && (step%SAVEFREQ) == 0 )
             save( fsave, n, particles );
         
@@ -123,27 +139,7 @@ int main( int argc, char **argv )
         {
             local[i].ax = local[i].ay = 0;
             for (int j = 0; j < n; j++ )
-                apply_force( local[i], particles[j], &dmin, &davg, &navg );
-        }
-     
-        if( find_option( argc, argv, "-no" ) == -1 )
-        {
-          
-          MPI_Reduce(&davg,&rdavg,1,MPI_DOUBLE,MPI_SUM,0,MPI_COMM_WORLD);
-          MPI_Reduce(&navg,&rnavg,1,MPI_INT,MPI_SUM,0,MPI_COMM_WORLD);
-          MPI_Reduce(&dmin,&rdmin,1,MPI_DOUBLE,MPI_MIN,0,MPI_COMM_WORLD);
-
- 
-          if (rank == 0){
-            //
-            // Computing statistical data
-            //
-            if (rnavg) {
-              absavg +=  rdavg/rnavg;
-              nabsavg++;
-            }
-            if (rdmin < absmin) absmin = rdmin;
-          }
+                apply_force(local[i], particles[j], local_stats);
         }
 
         //
@@ -152,24 +148,27 @@ int main( int argc, char **argv )
         for( int i = 0; i < nlocal; i++ )
             move( local[i] );
     }
+
+    // Aggregate stats accumulated on local processes.
+    MPI_Reduce(&local_stats, &global_stats, 1, STATS, ADD_STATS, 0, MPI_COMM_WORLD);
+
     simulation_time = read_timer( ) - simulation_time;
   
     if (rank == 0) {  
       printf( "n = %d, simulation time = %g seconds", n, simulation_time);
 
-      if( find_option( argc, argv, "-no" ) == -1 )
+      if(!fast)
       {
-        if (nabsavg) absavg /= nabsavg;
-      // 
-      //  -the minimum distance absmin between 2 particles during the run of the simulation
-      //  -A Correct simulation will have particles stay at greater than 0.4 (of cutoff) with typical values between .7-.8
-      //  -A simulation were particles don't interact correctly will be less than 0.4 (of cutoff) with typical values between .01-.05
-      //
-      //  -The average distance absavg is ~.95 when most particles are interacting correctly and ~.66 when no particles are interacting
-      //
-      printf( ", absmin = %lf, absavg = %lf", absmin, absavg);
-      if (absmin < 0.4) printf ("\nThe minimum distance is below 0.4 meaning that some particle is not interacting");
-      if (absavg < 0.8) printf ("\nThe average distance is below 0.8 meaning that most particles are not interacting");
+        //
+        //  -the minimum distance absmin between 2 particles during the run of the simulation
+        //  -A Correct simulation will have particles stay at greater than 0.4 (of cutoff) with typical values between .7-.8
+        //  -A simulation were particles don't interact correctly will be less than 0.4 (of cutoff) with typical values between .01-.05
+        //
+        //  -The average distance absavg is ~.95 when most particles are interacting correctly and ~.66 when no particles are interacting
+        //
+        printf( ", absmin = %lf, absavg = %lf", global_stats.min, global_stats.avg);
+        if (global_stats.min < 0.4) printf ("\nThe minimum distance is below 0.4 meaning that some particle is not interacting");
+        if (global_stats.avg < 0.8) printf ("\nThe average distance is below 0.8 meaning that most particles are not interacting");
       }
       printf("\n");     
         
