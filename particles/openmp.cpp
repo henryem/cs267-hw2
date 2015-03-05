@@ -12,8 +12,7 @@
 //  benchmarking program
 //
 int main(int argc, char **argv) {
-  if( find_option( argc, argv, "-h" ) >= 0 )
-  {
+  if( find_option( argc, argv, "-h" ) >= 0) {
     printf( "Options:\n" );
     printf( "-h to see this help\n" );
     printf( "-n <int> to set number of particles\n" );

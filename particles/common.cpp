@@ -12,15 +12,6 @@
 double size;
 
 //
-//  tuned constants
-//
-#define density 0.0005
-#define mass    0.01
-#define cutoff  0.01
-#define min_r   (cutoff/100)
-#define dt      0.0005
-
-//
 //  timer
 //
 double read_timer( )
@@ -49,44 +40,83 @@ double set_size( int n )
 //
 //  Initialize the particle positions and velocities
 //
-std::unique_ptr<std::vector<particle_t>> init_particles(int n) {
-  std::vector<particle_t>* ps = new std::vector<particle_t>(n);
+#ifndef __CUDACC__
+  std::unique_ptr<std::vector<particle_t>> init_particles(int n) {
+    std::vector<particle_t>* ps = new std::vector<particle_t>(n);
 
-  srand48( time( NULL ) );
+    srand48( time( NULL ) );
 
-  int sx = (int)ceil(sqrt((double)n));
-  int sy = (n+sx-1)/sx;
+    int sx = (int)ceil(sqrt((double)n));
+    int sy = (n+sx-1)/sx;
 
-  int *shuffle = (int*)malloc( n * sizeof(int) );
-  for( int i = 0; i < n; i++ )
-    shuffle[i] = i;
+    int *shuffle = (int*)malloc( n * sizeof(int) );
+    for( int i = 0; i < n; i++ )
+      shuffle[i] = i;
 
-  for( int i = 0; i < n; i++ )
-  {
-    particle_t& p = (*ps)[i];
-    //
-    //  make sure particles are not spatially sorted
-    //
-    int j = lrand48()%(n-i);
-    int k = shuffle[j];
-    shuffle[j] = shuffle[n-i-1];
+    for( int i = 0; i < n; i++ )
+    {
+      particle_t& p = (*ps)[i];
+      //
+      //  make sure particles are not spatially sorted
+      //
+      int j = lrand48()%(n-i);
+      int k = shuffle[j];
+      shuffle[j] = shuffle[n-i-1];
 
-    //
-    //  distribute particles evenly to ensure proper spacing
-    //
-    p.x = size*(1.+(k%sx))/(1+sx);
-    p.y = size*(1.+(k/sx))/(1+sy);
+      //
+      //  distribute particles evenly to ensure proper spacing
+      //
+      p.x = size*(1.+(k%sx))/(1+sx);
+      p.y = size*(1.+(k/sx))/(1+sy);
 
-    //
-    //  assign random velocities within a bound
-    //
-    p.vx = drand48()*2-1;
-    p.vy = drand48()*2-1;
+      //
+      //  assign random velocities within a bound
+      //
+      p.vx = drand48()*2-1;
+      p.vy = drand48()*2-1;
+    }
+    free( shuffle );
+
+    return std::unique_ptr<std::vector<particle_t> >(ps);
   }
-  free( shuffle );
+#else
+  particle_t* init_particles(int n) {
+    particle_t* p = (particle_t*) malloc(n*sizeof(particle_t));
 
-  return std::unique_ptr<std::vector<particle_t> >(ps);
-}
+    srand48( time( NULL ) );
+
+    int sx = (int)ceil(sqrt((double)n));
+    int sy = (n+sx-1)/sx;
+
+    int *shuffle = (int*)malloc( n * sizeof(int) );
+    for( int i = 0; i < n; i++ )
+      shuffle[i] = i;
+
+    for( int i = 0; i < n; i++ )
+    {
+      //
+      //  make sure particles are not spatially sorted
+      //
+      int j = lrand48()%(n-i);
+      int k = shuffle[j];
+      shuffle[j] = shuffle[n-i-1];
+
+      //
+      //  distribute particles evenly to ensure proper spacing
+      //
+      p[i].x = size*(1.+(k%sx))/(1+sx);
+      p[i].y = size*(1.+(k/sx))/(1+sy);
+
+      //
+      //  assign random velocities within a bound
+      //
+      p[i].vx = drand48()*2-1;
+      p[i].vy = drand48()*2-1;
+    }
+    free( shuffle );
+    return p;
+  }
+#endif
 
 //
 //  interact two particles

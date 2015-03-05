@@ -37,10 +37,15 @@ else
 endif
 LIBS = -lstdc++
 
+# NVCC stuff:
+NVCC = nvcc
+NVCCFLAGS = -O3 -arch=sm_35
+NVCC_LIBS = -lm
+
 OWN_LIBS = common.o Grid.o Stats.o $(OWN_PTHREAD_BARRIER_LIB)
 OWN_OMP_LIBS = $(OWN_LIBS) OmpThreadsafeGrid.o
 
-TARGETS = serial autograder tests openmp mpi
+TARGETS = serial autograder tests openmp mpi gpu gpu-naive
 #pthreads
 
 all:	$(TARGETS)
@@ -57,6 +62,13 @@ openmp: openmp.o $(OWN_OMP_LIBS)
 	$(CC) $(CFLAGS) -o $@ $^ $(LIBS) $(OPENMP)
 mpi: mpi.o $(OWN_LIBS)
 	$(MPCC) $(CFLAGS) -o $@ $^ $(LIBS) $(MPILIBS)
+gpu: gpu.o common_gpu.o Stats.o
+	$(NVCC) -o $@ $(NVCCLIBS) gpu.o common_gpu.o Stats.o
+gpu-naive: gpu_naive.o common_gpu.o Stats.o
+	$(NVCC) -o $@ $(NVCCLIBS) gpu_naive.o common_gpu.o Stats.o
+
+# Load CUDA using the following command
+# module load cuda
 
 pthread_barrier.o: pthread_barrier.cpp pthread_barrier.h
 	$(CC) -c $(CFLAGS) $<
@@ -76,6 +88,12 @@ OmpThreadsafeGrid.o: OmpThreadsafeGrid.cpp OmpThreadsafeGrid.h
 	$(CC) -c $(OPENMP) $(CFLAGS) $<
 tests.o: tests.cpp Grid_test.cpp Grid.h catch.hpp
 	$(CC) -c $(CFLAGS) $<
+gpu.o: gpu.cu common.h
+	$(NVCC) -c $(NVCCFLAGS) gpu.cu
+gpu_naive.o: gpu_naive.cu common.h
+	$(NVCC) -c $(NVCCFLAGS) gpu_naive.cu
+common_gpu.o: common.cpp common.h
+	$(NVCC) --x=cu -o $@ -c $(NVCCFLAGS) common.cpp
 %.o: %.cpp %.h
 	$(CC) -c $(CFLAGS) $<
 

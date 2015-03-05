@@ -1,16 +1,30 @@
 #ifndef __CS267_COMMON_H__
 #define __CS267_COMMON_H__
 
-#include <memory>
-#include <vector>
+#ifndef __CUDACC__ // CUDA doesn't support things in <vector> or <memory>.
+  #include <memory>
+  #include <vector>
+#endif
 #include <stdio.h>
 #include "Stats.h"
 
-inline int min( int a, int b ) { return a < b ? a : b; }
-inline double min( double a, double b ) { return a < b ? a : b; }
-inline int max( int a, int b ) { return a > b ? a : b; }
-inline double max( double a, double b ) { return a > b ? a : b; }
+#ifndef __CUDACC__ // Already defined in CUDA code.
+  inline int min( int a, int b ) { return a < b ? a : b; }
+  inline int max( int a, int b ) { return a > b ? a : b; }
+  inline double min( double a, double b ) { return a < b ? a : b; }
+  inline double max( double a, double b ) { return a > b ? a : b; }
+#endif
 inline int div_round_up(int dividend, int divisor) { return (dividend - 1 + divisor) / divisor; }
+inline int div_round_up_f(double dividend, double divisor) { return (int) ((dividend - 1.0 + divisor) / divisor); }
+
+//
+//  tuned constants
+//
+const double density = 0.0005;
+const double mass = 0.01;
+const double cutoff = 0.01;
+const double min_r = (cutoff/100);
+const double dt = 0.0005;
 
 //
 //  saving parameters
@@ -47,8 +61,12 @@ double read_timer( );
 //  simulation routines
 //
 double set_size(int n);
-std::unique_ptr<std::vector<particle_t>> init_particles(int n);
-void apply_force( particle_t &particle, particle_t &neighbor, Stats &stats);
+#ifndef __CUDACC__ // CUDA doesn't support things in <vector>.
+  std::unique_ptr<std::vector<particle_t> > init_particles(int n);
+#else
+  particle_t* init_particles(int n);
+#endif
+void apply_force(particle_t &particle, particle_t &neighbor, Stats &stats);
 void move( particle_t &p );
 
 //
