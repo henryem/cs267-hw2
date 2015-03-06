@@ -19,6 +19,7 @@ ifneq ($(shell uname -a | grep Darwin),)
   FLAGS = -DCUSTOM_PTHREAD_BARRIER=1
   OWN_PTHREAD_BARRIER_LIB = pthread_barrier.o
   OSFOUND=1
+  RAW_NVCCFLAGS = -arch=sm_30 # My Mac supports Compute Level 3.0.  Not sure how to find this automatically.
 endif
 ifneq ($(shell uname -a | grep hopper),)
   HOPPER = 1
@@ -26,6 +27,14 @@ ifneq ($(shell uname -a | grep hopper),)
   OPENMP = -mp
   RAW_MPCC = $(RAW_CC)
   OSFOUND=1
+endif
+ifneq ($(shell uname -a | grep stampede),)
+  STAMPEDE = 1
+  RAW_CC = cc -Wall
+  OPENMP = -mp
+  RAW_MPCC = $(RAW_CC)
+  OSFOUND=1
+  RAW_NVCCFLAGS = -arch=sm_55 # I believe Stampede supports 5.5.
 endif
 
 CC = $(RAW_CC) $(FLAGS)
@@ -39,7 +48,7 @@ LIBS = -lstdc++
 
 # NVCC stuff:
 NVCC = nvcc
-NVCCFLAGS = -O3 -arch=sm_35
+NVCCFLAGS = $(CFLAGS) $(RAW_NVCCFLAGS)
 NVCC_LIBS = -lm
 
 OWN_LIBS = common.o Grid.o Stats.o $(OWN_PTHREAD_BARRIER_LIB)

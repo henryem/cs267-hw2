@@ -127,11 +127,13 @@ int main( int argc, char **argv )
 
     int blks = (n + NUM_THREADS - 1) / NUM_THREADS;
     compute_forces_gpu <<< blks, NUM_THREADS >>> (d_particles, n);
+    cudaThreadSynchronize();
 
     //
     //  move particles
     //
     move_gpu <<< blks, NUM_THREADS >>> (d_particles, n, size);
+    cudaThreadSynchronize();
 
     //
     //  save if necessary
