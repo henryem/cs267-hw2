@@ -1,14 +1,9 @@
-#
-# Hopper - NERSC 
-#
-# Portland Group Compilers PGI are loaded by default; for other compilers please check the module list
-#
-
 # This makefile is messy.  I apologize for having no idea what I'm doing.  This
 # all seems needlessly complicated in comparison to Java build tools.
 
 # Identify what machine we're on and set up some environment-specific flags:
 ifneq ($(shell uname -a | grep Ubuntu),)
+  # Not actually supported.
   RAW_CC = gcc
   OSFOUND=1
 endif
@@ -20,11 +15,14 @@ ifneq ($(shell uname -a | grep Darwin),)
   OWN_PTHREAD_BARRIER_LIB = pthread_barrier.o
   OSFOUND=1
   RAW_NVCCFLAGS = -arch=sm_30 # My Mac supports Compute Level 3.0.  Not sure how to find this automatically.
+  SUPPORTS_GPU=1
 endif
 ifneq ($(shell uname -a | grep hopper),)
+  # Does not support GPU build.  Also, the build assumes that GNU g++ is the compiler.
+  # Run ``module swap PrgEnv-pgi PrgEnv-gnu'' to switch.
   HOPPER = 1
-  RAW_CC = cc -Wall
-  OPENMP = -mp
+  RAW_CC = cc -std=c++0x -Wall
+  OPENMP = -fopenmp
   RAW_MPCC = $(RAW_CC)
   OSFOUND=1
 endif
@@ -35,6 +33,7 @@ ifneq ($(shell uname -a | grep stampede),)
   RAW_MPCC = $(RAW_CC)
   OSFOUND=1
   RAW_NVCCFLAGS = -arch=sm_55 # I believe Stampede supports 5.5.
+  SUPPORTS_GPU=1
 endif
 
 CC = $(RAW_CC) $(FLAGS)
@@ -55,7 +54,10 @@ NVCC_LIBS = -lm
 OWN_LIBS = common.o Grid.o Stats.o $(OWN_PTHREAD_BARRIER_LIB)
 OWN_OMP_LIBS = $(OWN_LIBS) OmpThreadsafeGrid.o
 
-TARGETS = serial autograder tests openmp mpi gpu gpu-naive
+TARGETS = serial autograder tests openmp mpi
+ifdef SUPPORTS_GPU
+  TARGETS += gpu gpu-naive
+endif
 #pthreads
 
 all:	$(TARGETS)
