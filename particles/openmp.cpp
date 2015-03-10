@@ -75,8 +75,6 @@ int main(int argc, char **argv) {
     int thread_idx = omp_get_thread_num();    
     Stats thread_stats;
     for (int step = 0; step < 1000; step++) {
-      //TODO: Does this need to be declared private?
-
       // If this is the first step, we must initialize the grid here
       // without respecting cache locality.  Since we cannot use the existing
       // grid, we have to just divide the particles arbitrarily.  This
