@@ -10,6 +10,20 @@ SCENARIO( "Adding and moving items in a grid", "[grid]" ) {
         REQUIRE_FALSE(i->hasNext());
       }
     }
+    WHEN("we add an element to the grid") {
+      particle_t p(0.5, 0.5);
+      g.add(p);
+      THEN("we see it") {
+        std::unique_ptr<SimpleIterator<particle_t&> > i = g.neighbor_iterator(particle_t(0.5, 0.5));
+        int num_particles_observed = 0;
+        while (i->hasNext()) {
+          particle_t& found_particle = i->next();
+          REQUIRE(&found_particle == &p);
+          num_particles_observed++;
+        }
+        REQUIRE(num_particles_observed == 1);
+      }
+    }
   }
 
   GIVEN("A 1x1 grid with a few elements") {
@@ -34,6 +48,38 @@ SCENARIO( "Adding and moving items in a grid", "[grid]" ) {
           particle_t& p = i->next();
           REQUIRE((p.x == 0.3 || (p.x == 0.4 && p.y == 0.2)));
         }
+      }
+    }
+    WHEN("a particle is removed") {
+      bool was_removed = g.remove(ps[0]);
+      THEN("remove() returns true") {
+        REQUIRE(was_removed);
+      }
+      THEN("we no longer see it in the grid") {
+        std::unique_ptr<SimpleIterator<particle_t&> > i = g.neighbor_iterator(particle_t(0.5, 0.5));
+        int num_particles_observed = 0;
+        while (i->hasNext()) {
+          particle_t& p = i->next();
+          REQUIRE(&p == &ps[1]);
+          num_particles_observed++;
+        }
+        REQUIRE(num_particles_observed == 1);
+      }
+    }
+    WHEN("a nonexistent particle is removed") {
+      bool was_removed = g.remove(particle_t(0.4, 0.4));
+      THEN("remove() returns false") {
+        REQUIRE(!was_removed);
+      }
+      THEN("the grid is unchanged") {
+        std::unique_ptr<SimpleIterator<particle_t&> > i = g.neighbor_iterator(particle_t(0.5, 0.5));
+        int num_particles_observed = 0;
+        while (i->hasNext()) {
+          particle_t& p = i->next();
+          REQUIRE((&p == &ps[0] || &p == &ps[1]));
+          num_particles_observed++;
+        }
+        REQUIRE(num_particles_observed == 2);
       }
     }
   }

@@ -187,3 +187,15 @@ std::unique_ptr<SimpleIterator<particle_t&> > Grid::subgrid(int subgrid_idx, int
 void Grid::add(particle_t& p) {
   square(flat_idx(p)).push_back(&p);
 }
+
+bool Grid::remove(const particle_t& p) {
+  Square& s = square(p);
+  for (Square::iterator i = s.begin(); i != s.end(); i++) {
+    particle_t& possible_p = **i;
+    if (&possible_p == &p) {
+      s.erase(i);
+      return true;
+    }
+  }
+  return false;
+}

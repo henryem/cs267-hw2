@@ -27,6 +27,7 @@ public:
   OmpThreadsafeGrid(double side_length, int num_squares_per_side, std::vector<particle_t>& particles);
   virtual ~OmpThreadsafeGrid();
   virtual void add(particle_t& p);
+  virtual bool remove(const particle_t& p);
 };
 
 #endif /* OMPTHREADSAFEGRID_H_ */
