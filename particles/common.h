@@ -15,7 +15,7 @@
   inline double max( double a, double b ) { return a > b ? a : b; }
 #endif
 inline int div_round_up(int dividend, int divisor) { return (dividend - 1 + divisor) / divisor; }
-inline int div_round_up_f(double dividend, double divisor) { return (int) ((dividend - 1.0 + divisor) / divisor); }
+inline int div_round_up_f(double dividend, double divisor) { return (int) ceil(dividend / divisor); }
 
 //
 //  tuned constants
@@ -29,6 +29,7 @@ const double dt = 0.0005;
 //
 //  saving parameters
 //
+//const int NSTEPS = 10;
 const int NSTEPS = 1000;
 const int SAVEFREQ = 10;
 

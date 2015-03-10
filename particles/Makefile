@@ -41,6 +41,7 @@ CC = $(RAW_CC) $(FLAGS)
 MPCC = $(RAW_MPCC) $(FLAGS)
 ifdef DEBUG
   CFLAGS = -O0 -g -pg
+  RAW_NVCCFLAGS += -DTHRUSTDEBUG
 else
   CFLAGS = -O3
 endif
