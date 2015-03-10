@@ -81,7 +81,7 @@ void save( FILE *f, int n, particle_t *p );
 //
 
 void dump_particle(particle_t *p, int count, int rank);
-int find_boundry_proc(particle_t p, int reduced_n_proc, int * partition_grids, double grid_size, int * find_boundry_proc);
+int find_boundry_proc(particle_t p, int reduced_n_proc, int * partition_grids, double grid_size, int * find_boundry_proc, int num_grid_squares_per_side);
 
 int find_proc_no(particle_t p, int reduced_n_proc, int * partition_grids, double grid_size);
 int find_option( int argc, char **argv, const char *option );

@@ -12,7 +12,8 @@
 //  benchmarking program
 //
 int main(int argc, char **argv) {
-  if( find_option( argc, argv, "-h" ) >= 0) {
+  if( find_option( argc, argv, "-h" ) >= 0 )
+  {
     printf( "Options:\n" );
     printf( "-h to see this help\n" );
     printf( "-n <int> to set number of particles\n" );
@@ -69,9 +70,9 @@ int main(int argc, char **argv) {
   #pragma omp parallel
   {
     #pragma omp atomic write
-    num_actual_threads = omp_get_num_threads();
+    num_actual_threads = omp_get_num_threads();   //get number of actual threads
 
-    int thread_idx = omp_get_thread_num();
+    int thread_idx = omp_get_thread_num();    
     Stats thread_stats;
     for (int step = 0; step < 1000; step++) {
       //TODO: Does this need to be declared private?

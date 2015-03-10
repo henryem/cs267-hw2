@@ -192,10 +192,15 @@ void save( FILE *f, int n, particle_t *p )
 }
 
 
-int find_boundry_proc(particle_t p, int reduced_n_proc, int * partition_grids, double grid_size, int * boundry_proc)
+int find_boundry_proc(particle_t p, int reduced_n_proc, int * partition_grids, double grid_size, int * boundry_proc, int num_grid_squares_per_side)
 {
+    //printf("p.x = %f, grid_size = %f\n",p.x, grid_size);
     int grid_x = p.x / grid_size;
     int grid_y = p.y / grid_size;
+    if (grid_x >= num_grid_squares_per_side)
+        grid_x = num_grid_squares_per_side-1;
+    if (grid_y >= num_grid_squares_per_side)
+        grid_y = num_grid_squares_per_side-1;
     //printf("the grid_x is %d, the grid_y is %d\n",grid_x, grid_y);  
 
 
