@@ -8,6 +8,7 @@
 #include <sys/time.h>
 #include "common.h"
 #include "Stats.h"
+#include <limits.h>
 
 double size;
 
@@ -190,6 +191,110 @@ void save( FILE *f, int n, particle_t *p )
         fprintf( f, "%g %g\n", p[i].x, p[i].y );
 }
 
+
+int find_boundry_proc(particle_t p, int reduced_n_proc, int * partition_grids, double grid_size, int * boundry_proc)
+{
+    int grid_x = p.x / grid_size;
+    int grid_y = p.y / grid_size;
+    //printf("the grid_x is %d, the grid_y is %d\n",grid_x, grid_y);  
+
+
+    int count = 0;
+    int row = -1;
+    int column = -1;
+    int proc_per_side = sqrt(reduced_n_proc);
+
+    // Find neiborhood proc
+    for (int i = 1; partition_grids[i]< INT_MAX; i++){
+        if (grid_x == partition_grids[i]-1){
+            row = grid_y/partition_grids[1];
+            boundry_proc[count] = i + row *proc_per_side; 
+            count++;
+        }
+        else if (grid_x == partition_grids[i]){
+            row = grid_y/partition_grids[1];
+            boundry_proc[count] = (i-1) + row *proc_per_side; 
+            count++;
+        }
+        if (grid_y == partition_grids[i]-1){
+            column = grid_x/partition_grids[1];
+            boundry_proc[count] = i *proc_per_side+ column ; 
+            count++;
+        }
+        else if (grid_y == partition_grids[i]){
+            column = grid_x/partition_grids[1];
+            boundry_proc[count] = (i-1) *proc_per_side + column; 
+            count++;
+        }
+    }
+    // Find Digno proc only when there are already two proc
+    if (count == 2){
+        if ( (grid_x % partition_grids[1] == partition_grids[1] -1) && (grid_y % partition_grids[1] == partition_grids[1] -1 ))
+        {
+            boundry_proc[count] = (grid_x/partition_grids[1]+1) + (grid_y/partition_grids[1]+1)*proc_per_side;
+            count++;
+        }
+        else if ( (grid_x % partition_grids[1] == 0) && (grid_y % partition_grids[1] == partition_grids[1] -1))
+        {
+            boundry_proc[count] = (grid_x/partition_grids[1]-1) + (grid_y/partition_grids[1]+1)*proc_per_side;
+            count++;
+        }
+        else if ( (grid_x % partition_grids[1] == partition_grids[1] -1) && (grid_y % partition_grids[1] == 0))
+        {
+            boundry_proc[count] = (grid_x/partition_grids[1]+1) + (grid_y/partition_grids[1]-1)*proc_per_side;
+            count++;
+        }
+        else if ( (grid_x % partition_grids[1] == 0) && (grid_y % partition_grids[1] == 0 ))
+        {
+            boundry_proc[count] = (grid_x/partition_grids[1]-1) + (grid_y/partition_grids[1]-1)*proc_per_side;
+            count++;
+        }
+    }
+    /*
+    for (int i =0; i<count; i++){
+        printf("The partition is at boundry of processor: %d\n", boundry_proc[i]);
+    }
+    */
+    return count;
+
+}
+
+// Using for debugging
+void dump_particle(particle_t *p, int count, int rank)
+{
+    for (int i = 0; i < count; i++){
+        printf("p%d: (%f,%f)\n",rank, p[i].x, p[i].y);
+    }
+}
+
+//
+// given a particle, return the processor number it has been assigned.
+//
+int find_proc_no(particle_t p, int reduced_n_proc, int * partition_grids, double grid_size){
+    
+    //printf("the grid_size is %g\n", grid_size);
+    // printf("the x is %g, the y is %g\n",p.x, p.y);    
+    int grid_x = p.x / grid_size;
+    int grid_y = p.y / grid_size;
+    //printf("the grid_x is %d, the grid_y is %d\n",grid_x, grid_y);  
+
+
+    int i,j;
+    for (i = 0; i< reduced_n_proc; i++){
+        if (grid_x < partition_grids[i+1])
+            break;
+    }
+    for (j = 0; j< reduced_n_proc; j++){
+        if (grid_y < partition_grids[j+1])
+            break;
+    }
+
+    //printf("i=%d, j=%d\n", i,j);
+
+    return i+j*sqrt(reduced_n_proc);
+
+}
+
 //
 //  command line option processing
 //
@@ -200,6 +305,7 @@ int find_option( int argc, char **argv, const char *option )
             return i;
     return -1;
 }
+
 
 int read_int( int argc, char **argv, const char *option, int default_value )
 {

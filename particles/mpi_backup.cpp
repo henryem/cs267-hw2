@@ -40,7 +40,8 @@ int main( int argc, char **argv )
     const bool fast = (find_option( argc, argv, "-no" ) != -1);
     const char *savename = read_string( argc, argv, "-o", NULL );
     const char *sumname = read_string( argc, argv, "-s", NULL );
- 
+    const int num_threads_override = read_int( argc, argv, "-p", 0);
+
     const double size = set_size( n );
     // We need to set the size of a grid square so that the average number of
     // particles per grid square is constant.  The simulation already ensures
@@ -83,7 +84,7 @@ int main( int argc, char **argv )
         num_grid_squares_per_side_per_proc = num_grid_squares_per_side / n_proc_per_side;
     else
         num_grid_squares_per_side_per_proc = num_grid_squares_per_side / n_proc_per_side + 1;
-//    printf("Num of grids per side per processor is %d\n", num_grid_squares_per_side_per_proc);
+    printf("Num of grids per side per processor is %d\n", num_grid_squares_per_side_per_proc);
 
     //
     //  allocate generic resources
@@ -123,6 +124,28 @@ int main( int argc, char **argv )
         partition_grids[i] = i * num_grid_squares_per_side_per_proc;
         //printf("partition_grids %d is %d\n", i, partition_grids[i] );
     }
+
+
+    // Not use: delete later    
+    //
+    //  set up the data partitioning across processors
+    //
+    int particle_per_proc = (n + n_proc - 1) / n_proc;
+
+    int *partition_offsets = (int*) malloc( (n_proc+1) * sizeof(int) );
+    for( int i = 0; i < n_proc+1; i++ )
+        partition_offsets[i] = min( i * particle_per_proc, n );
+    
+    int *partition_sizes = (int*) malloc( n_proc * sizeof(int) );
+    for( int i = 0; i < n_proc; i++ )
+        partition_sizes[i] = partition_offsets[i+1] - partition_offsets[i];
+    
+    
+    //  Not use: delete later
+    //  allocate storage for local partition
+    //
+    int nlocal = partition_sizes[rank];
+    particle_t *local = (particle_t*) malloc( nlocal * sizeof(particle_t) );
     
     //
     //  initialize and distribute the particles (that's fine to leave it unoptimized)
@@ -171,14 +194,23 @@ int main( int argc, char **argv )
             }
         } 
 
+        /*
+        for (int i = 0; i< reduced_n_proc; i++)
+            printf("process %d is going to receive %d particles. \n", i,p_counter[i]);
+            */
+        for (int i = 0; i< reduced_n_proc; i++)
+            printf("process %d is going to receive %d particles. \n", i,b_counter[i]);
+        
+        /*        
+        for (int i = 0; i< p_counter[0]; i++){
+            printf ("the %d element of p_buf is (%f,%f)\n", i, p_buf[0+i].x, p_buf[0+i].y);
+        }
+        */
         MPI_Request request, request2;
         for (int i = 0; i< reduced_n_proc; i++){
             MPI_Isend(&p_buf[i*n],p_counter[i],PARTICLE,i,0,MPI_COMM_WORLD, &request);   // Using tag value 0 to indicate it's particle inside the processor
             MPI_Isend(&b_buf[i*n],b_counter[i],PARTICLE,i,1,MPI_COMM_WORLD, &request2);  // Using tag value 1 to indicate it's particle at the boundry of processor
         }
-
-        free(p_buf);
-        free(b_buf);
     }
 
 
@@ -196,9 +228,8 @@ int main( int argc, char **argv )
 
     // Each processor receive particles from processor zero.
     int count_inside, count_boundry;
-
-
-
+    //Grid inside_grid(size, size / grid_square_size);
+    Grid boundry_grid(size, size / grid_square_size);
     particle_t *p_inside = (particle_t *) malloc(n*sizeof(particle_t));
     particle_t *p_boundry = (particle_t *) malloc(n*sizeof(particle_t));
 
@@ -212,38 +243,36 @@ int main( int argc, char **argv )
         MPI_Get_count(&status2, PARTICLE,&count_boundry);
 
         //Debug
-        //printf("I'm processor %d, I received %d inside particles \n",rank,count_inside);
-        //printf("I'm processor %d, I received %d boundry particles \n",rank,count_boundry);
+        printf("I'm processor %d, I received %d inside particles \n",rank,count_inside);
+        printf("I'm processor %d, I received %d boundry particles \n",rank,count_boundry);
         //printf("I'm processor %d, the first particle I received is (%f,%f)\n",rank,p_boundry[0].x,p_boundry[0].y);
 
+        for (int i = 0; i< count_inside; i++){
+            //inside_grid.add(p_inside[i]);
+            boundry_grid.add(p_inside[i]);
+        }
+
+        for (int i = 0; i< count_boundry; i++)           
+            boundry_grid.add(p_boundry[i]);
     }
 
 
-    for( int step = 0; step < 1000/*NSTEPS*/; step++ )
+    for( int step = 0; step < NSTEPS; step++ )
     {
         if (rank < reduced_n_proc){
-
             //Calculate force
             for (int i = 0; i< count_inside; i++){
                 //printf("p%d:(%f,%f)\n",rank,p_inside[i].x, p_inside[i].y);
                 particle_t& p = p_inside[i];
                 p.ax = p.ay = 0;
-
-                for (int j = 0; j < count_inside; j++){
-                    if (p_inside[j].x == p.x && p_inside[j].y == p.y)
-                        continue;
-                    else{
-                        apply_force(p,p_inside[j], local_stats);
+                std::unique_ptr<SimpleIterator<particle_t&> > neighbors = boundry_grid.neighbor_iterator(p);
+                while (neighbors->hasNext()) {
+                    particle_t& neighbor = neighbors->next();
+                    if (p.x!=neighbor.x || p.y!=neighbor.y){
+                        //printf("Particle(%f,%f) has neibor particle: (%f,%f)\n", p.x,p.y ,neighbor.x, neighbor.y);
+                        apply_force(p, neighbor,local_stats);
                     }
                 }
-
-                int boundry_never_use[3];
-                if (find_boundry_proc(p, reduced_n_proc, partition_grids, grid_square_size, boundry_never_use) !=0){
-                    for (int j = 0; j < count_boundry; j++){
-                        apply_force(p, p_boundry[j], local_stats);
-                    }
-                }
-
             }
             // Move the particles
             for( int i = 0; i < count_inside; i++ ){
@@ -292,7 +321,7 @@ int main( int argc, char **argv )
                     for (int j = 0; j<count; j++){
                         int proc_no = boundry_proc[j];
                         
-//                        printf("p%d: throw boundry (%f,%f) to %d\n", rank, p_inside[i].x, p_inside[i].y, proc_no);
+                        printf("p%d: throw boundry (%f,%f) to %d\n", rank, p_inside[i].x, p_inside[i].y, proc_no);
                         
                         b_buf[proc_no*n+b_counter[proc_no]] = p_inside[i];
                         b_counter[proc_no] +=1;
@@ -306,15 +335,20 @@ int main( int argc, char **argv )
                     p_inside[i] = p_inside[count_inside-1];
                     count_inside -=1;
                     i -=1;
-
+                    //printf("p%d: remove 1 particle, currently has %d particles\n", rank, count_inside);
+                    //dump_particle(p_inside,count_inside, rank); 
                 }
             }
+
+/*
+            for (int i = 0; i < count_inside; i++){
+                printf("after p%d:(%f,%f)\n",rank,p_inside[i].x, p_inside[i].y);
+            }
+*/
 
             // Sending out the particles
             MPI_Request request, request2;
             for (int i = 0; i< reduced_n_proc; i++){
-//                printf("p%d: send %d inside particles to p%d\n",rank, p_counter[i], i);
-//                printf("p%d: send %d boundry particles to p%d\n",rank, b_counter[i], i);
                 MPI_Isend(&p_buf[i*n],p_counter[i],PARTICLE,i,0,MPI_COMM_WORLD, &request);   // Using tag value 0 to indicate it's particle inside the processor
                 MPI_Isend(&b_buf[i*n],b_counter[i],PARTICLE,i,1,MPI_COMM_WORLD, &request2);  // Using tag value 1 to indicate it's particle at the boundry of processor
             }            
@@ -336,31 +370,74 @@ int main( int argc, char **argv )
             
                 MPI_Get_count(&status, PARTICLE,&receive_count_inside);
                 MPI_Get_count(&status2, PARTICLE,&receive_count_boundry);
-             
+
+                //Debug:
+
+/*
+                if (receive_count_inside > 0)
+                    printf("p%d receive %d particles from p%d as inside particles\n",rank,receive_count_inside, i);
+*/                
+                
+                if (receive_count_boundry > 0)
+                    printf("p%d receive %d particles from p%d as boundry particles\n",rank,receive_count_boundry, i);
+                
+
                 total_count_inside += receive_count_inside;
                 total_count_boundry += receive_count_boundry;
 
+            }
+
+            //printf("p%d: total_count_inside is now %d\n", rank, total_count_inside);
+            printf("p%d: total_count_boundry is now %d\n", rank, total_count_boundry);
+
+            //Debug
+    /*
+            for (int i = 0; i< total_count_inside; i++){
+                printf("p%d: Receive (%f,%f) as inside_particles\n", rank, receive_inside[i].x, receive_inside[i].y);
+            }
+*/
+            for (int i = 0; i< total_count_boundry; i++){
+                printf("p%d: Receive (%f,%f) as boundry_particles\n", rank, receive_boundry[i].x, receive_boundry[i].y);
             }
 
             //Update p_inside
             for (int i = 0; i < total_count_inside; i++){
                 p_inside[count_inside] = receive_inside[i];
                 count_inside +=1;
-            }
 
-            count_boundry = 0;
+/*
+                if (total_count_inside > 0){
+                    printf("p%d: after receiving, now has %d particles\n", rank, count_inside);
+                    dump_particle(p_inside,count_inside, rank);
+
+                }
+*/
+            }
+            //update p_boundry
+            Grid boundry_grid(size, size / grid_square_size);
+
+            //Add inside particle into boundry grid
+            for (int i = 0; i < count_inside; i++){
+
+                boundry_grid.add(p_inside[i]);
+            }
+            // Add boundry particle into boundry grid
             for (int i = 0; i < total_count_boundry; i++){
-                p_boundry[count_boundry] = receive_boundry[i];
-                count_boundry+=1;
+                boundry_grid.add(receive_boundry[i]);
+                printf("p%d: add (%f,%f) into boundry_grid\n", rank, receive_boundry[i].x,receive_boundry[i].y);
             }
-
-            free(p_buf);
-            free(b_buf);
-            free(receive_inside);
-            free(receive_boundry);
-            free(boundry_proc);
 
         }
+
+        // Need to remove later
+        //  collect all global data locally (not good idea to do)
+        //
+
+
+        /*
+        MPI_Allgatherv( local, nlocal, PARTICLE, particles, partition_sizes, partition_offsets, PARTICLE, MPI_COMM_WORLD );
+        */
+
 
         //
         //  save current step if necessary (slightly different semantics than in other codes)
@@ -373,6 +450,21 @@ int main( int argc, char **argv )
         //  compute all forces
         //
 
+
+        /*
+        for( int i = 0; i < nlocal; i++ )
+        {
+            local[i].ax = local[i].ay = 0;
+            for (int j = 0; j < n; j++ )
+                apply_force(local[i], particles[j], local_stats);
+        }
+
+        //
+        //  move particles
+        //
+        for( int i = 0; i < nlocal; i++ )
+            move( local[i] );
+        */
     }
 
     // Aggregate stats accumulated on local processes.
@@ -410,8 +502,9 @@ int main( int argc, char **argv )
     //
     if ( fsum )
         fclose( fsum );
-
-
+    free( partition_offsets );
+    free( partition_sizes );
+    free( local );
     free( particles );
     if( fsave )
         fclose( fsave );

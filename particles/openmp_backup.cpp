@@ -12,7 +12,8 @@
 //  benchmarking program
 //
 int main(int argc, char **argv) {
-  if( find_option( argc, argv, "-h" ) >= 0) {
+  if( find_option( argc, argv, "-h" ) >= 0 )
+  {
     printf( "Options:\n" );
     printf( "-h to see this help\n" );
     printf( "-n <int> to set number of particles\n" );
@@ -44,8 +45,8 @@ int main(int argc, char **argv) {
   std::unique_ptr<std::vector<particle_t> > particles = init_particles(n);
 
   if (num_threads_override > 0) {
-    omp_set_dynamic(0);   // fixed number of threads
-    omp_set_num_threads(num_threads_override);  // assign number of threads
+    omp_set_dynamic(0);
+    omp_set_num_threads(num_threads_override);
   }
 
   //

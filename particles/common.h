@@ -78,6 +78,11 @@ void save( FILE *f, int n, particle_t *p );
 //
 //  argument processing routines
 //
+
+void dump_particle(particle_t *p, int count, int rank);
+int find_boundry_proc(particle_t p, int reduced_n_proc, int * partition_grids, double grid_size, int * find_boundry_proc);
+
+int find_proc_no(particle_t p, int reduced_n_proc, int * partition_grids, double grid_size);
 int find_option( int argc, char **argv, const char *option );
 int read_int( int argc, char **argv, const char *option, int default_value );
 char *read_string( int argc, char **argv, const char *option, char *default_value );

@@ -196,11 +196,12 @@ int main( int argc, char **argv )
 
     // Each processor receive particles from processor zero.
     int count_inside, count_boundry;
-
-
-
+    //Grid inside_grid(size, size / grid_square_size);
+    Grid boundry_grid(size, size / grid_square_size);
     particle_t *p_inside = (particle_t *) malloc(n*sizeof(particle_t));
     particle_t *p_boundry = (particle_t *) malloc(n*sizeof(particle_t));
+
+
 
     if (rank < reduced_n_proc){
         MPI_Status status, status2;
@@ -222,7 +223,6 @@ int main( int argc, char **argv )
     for( int step = 0; step < 1000/*NSTEPS*/; step++ )
     {
         if (rank < reduced_n_proc){
-
             //Calculate force
             for (int i = 0; i< count_inside; i++){
                 //printf("p%d:(%f,%f)\n",rank,p_inside[i].x, p_inside[i].y);
@@ -236,12 +236,8 @@ int main( int argc, char **argv )
                         apply_force(p,p_inside[j], local_stats);
                     }
                 }
-
-                int boundry_never_use[3];
-                if (find_boundry_proc(p, reduced_n_proc, partition_grids, grid_square_size, boundry_never_use) !=0){
-                    for (int j = 0; j < count_boundry; j++){
-                        apply_force(p, p_boundry[j], local_stats);
-                    }
+                for (int j = 0; j < count_boundry; j++){
+                    apply_force(p, p_boundry[j], local_stats);
                 }
 
             }
