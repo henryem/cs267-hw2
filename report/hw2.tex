@@ -1,0 +1,130 @@
+\documentclass{article}
+\usepackage{amsmath, amssymb}
+\usepackage[retainorgcmds]{IEEEtrantools}
+\usepackage{filecontents}
+\usepackage{hyperref}
+\author{Henry Milner}
+\title
+\date
+
+% Some functions for general use.
+
+\def\seqn#1\eeqn{\begin{align}#1\end{align}}
+
+\newcommand{\vecName}[1]%
+  {\boldsymbol{#1}}
+
+\newcommand{\io}%
+  {\text{ i.o. }}
+
+\newcommand{\eventually}%
+  {\text{ eventually }}
+
+\newcommand{\tr}%
+  {\text{tr}}
+
+\newcommand{\Cov}%
+  {\text{Cov}}
+
+\newcommand{\adj}%
+  {\text{adj}}
+
+\newcommand{\funcName}[1]%
+  {\text{#1}}
+
+\newcommand{\hasDist}%
+  {\sim}
+
+\DeclareMathOperator*{\E}%
+  {\mathbb{E}}
+
+\newcommand{\Var}%
+  {\text{Var}}
+
+\newcommand{\std}%
+  {\text{std}}
+
+\newcommand{\grad}%
+  {\nabla}
+
+\DeclareMathOperator*{\argmin}{arg\,min}
+
+\DeclareMathOperator*{\argmax}{arg\,max}
+
+\newcommand{\inprod}[2]%
+  {\langle #1, #2 \rangle}
+
+\newcommand{\dd}[1]%
+  {\frac{\delta}{\delta#1}}
+
+\newcommand{\Reals}%
+  {\mathbb{R}}
+
+\newcommand{\indep}%
+  {\protect\mathpalette{\protect\independenT}{\perp}} \def\independenT#1#2{\mathrel{\rlap{$#1#2$}\mkern2mu{#1#2}}}
+
+\newcommand{\defeq}%
+  {\buildrel\triangle\over =}
+
+\newcommand{\defn}[1]%
+  {\emph{Definition: #1}\\}
+
+\newcommand{\example}[1]%
+  {\emph{Example: #1}\\}
+
+\newcommand{\figref}[1]%
+  {\figurename~\ref{#1}}
+
+\newtheorem{theorem}{Theorem}[section]
+\newtheorem{lemma}[theorem]{Lemma}
+\newenvironment{proof}[1][Proof]{\begin{trivlist}
+\item[\hskip \labelsep {\bfseries #1}]}{\end{trivlist}}
+
+\begin{filecontents}{\jobname.bib}
+%@book{foo
+%}
+\end{filecontents}
+
+\begin{document}
+\maketitle
+
+\section{Introduction}
+
+\section{Serial Implementation}
+% Describe algorithm: Grid data structure
+% Plot: O(n) scaling
+% Plot: Compare with serial-naive
+% Plot: Hopper versus laptop
+
+\section{OpenMP Implementation}
+% Describe algorithm: Grid data structure; threads handle subgrids; communication between threads is implicit and of size O(particles that moved across subgrid boundaries)
+% Describe synchronization: Locking on grid inserts (monotonic operation) plus barriers before/after reads.
+% Plot: O(n) scaling on Hopper: n = 1000, 4000, 16000, 64000, 256000
+% Plot: Weak scaling(?) on Hopper: p = 1, 2, 4, 8, 16, 24; n = 1000, 4000, 16000, 64000 (* number of cores) [use more / less if possible on Hopper]
+% Plot: Strong scaling(?) on Hopper: p = 1, 2, 4, 8, 16, 24; n = 1000, 4000, 16000, 64000
+
+\section{MPI Implementation}
+% Plot: O(n) scaling on Hopper: n = 1000, 4000, 16000, 64000, 256000
+% Plot: Weak scaling(?) on Hopper: p = 1, 4, 16, 64, 256
+% Plot: Strong scaling(?) on Hopper: p = 1, 4, 16, 64, 256
+% Plot: Compare grid- and non-grid O((n/p)^2) code for small problem sizes.
+
+\section{CUDA Implementation}
+% Describe algorithm.
+% Describe sorting algorithm and plans for future work.
+% Plot: O(n) scaling on Stampede: n = 1000, 4000, 16000, 64000, 256000, 1024000, 4096000
+% Plot: Laptop versus Stampede: n = 1000, 4000, 16000, 64000, 256000, 1024000, 4096000 [last two on Stampede only due to memory constraints]
+
+\section{Observations}
+
+\subsection{Performance Comparison}
+% One plot with all algorithms: serial-naive, serial, OpenMP (p=24), MPI (p=24), MPI (p=256), CUDA-naive, CUDA, CUDA-laptop: n = 250, 1000, 4000, 16000, 64000, 256000, 1024000, 4096000 [as applicable]
+
+\subsection{Programming Environment}
+% OpenMP: One difficulty was that there are no fine-grained locks without full memory barriers.
+% CUDA: We used Thrust.  Provides a mapreduce-style interface, though not really mapreduce (since things are necessarily mutable).  Some opaque crashes.  Mapreduce is not quite the right abstraction for us; something like GraphLab would have been better.  As is, we had to use a general sort, which technically introduces O(n log n) scaling, though this was unnoticeable in our tests.  And we had to break out of Thrust for the force simulation.
+
+%\bibliographystyle{plain}
+%\bibliography{\jobname}
+
+\end{document}
