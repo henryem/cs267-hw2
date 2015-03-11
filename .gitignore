@@ -32,6 +32,9 @@ autograder
 pthreads
 openmp
 serial
+mpi
+gpu
+gpu-naive
 tests
 
 particles/openmp.txt
