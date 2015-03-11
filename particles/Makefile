@@ -26,6 +26,15 @@ ifneq ($(shell uname -a | grep hopper),)
   RAW_MPCC = $(RAW_CC)
   OSFOUND=1
 endif
+ifneq ($(shell uname -a | grep edison),)
+  # Does not support GPU build.  Also, the build assumes that GNU g++ is the compiler.
+  # Run ``module swap PrgEnv-pgi PrgEnv-gnu'' to switch.
+  HOPPER = 1
+  RAW_CC = cc -std=c++0x -Wall
+  OPENMP = -fopenmp
+  RAW_MPCC = $(RAW_CC)
+  OSFOUND=1
+endif
 ifneq ($(shell uname -a | grep stampede),)
   STAMPEDE = 1
   RAW_CC = cc -Wall
