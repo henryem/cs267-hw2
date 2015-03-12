@@ -36,12 +36,13 @@ ifneq ($(shell uname -a | grep edison),)
   OSFOUND=1
 endif
 ifneq ($(shell uname -a | grep stampede),)
+  # Note: Need to ``module load cuda'' first.
   STAMPEDE = 1
   RAW_CC = cc -Wall
   OPENMP = -mp
   RAW_MPCC = $(RAW_CC)
   OSFOUND=1
-  RAW_NVCCFLAGS = -arch=sm_55 # I believe Stampede supports 5.5.
+  RAW_NVCCFLAGS = -arch=sm_35
   SUPPORTS_GPU=1
 endif
 
