@@ -1,7 +1,7 @@
 export SUBMIT_JOB=$(dirname $0)/submit-job
 
 # serial-naive
-for NUM_PARTICLES in 100 200 400 800 1600 3200 6400 12800; do
+for NUM_PARTICLES in 100 200 400 800 1600 3200; do
   $SUBMIT_JOB -m hopper -j serial-naive -n $NUM_PARTICLES
 done
 
