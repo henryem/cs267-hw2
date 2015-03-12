@@ -2,6 +2,7 @@
 
 import argparse
 import os
+import os.path
 
 def writeScriptAndRun(scriptRunner, script, scriptPath):
   with open(scriptPath, "w") as scriptFile:
@@ -16,6 +17,7 @@ def main():
   parser.add_argument("-t", "--threads", type=int, default=1)
   parser.add_argument("-p", "--processors", type=int, default=1)
   parser.add_argument("-n", "--numParticles", type=int)
+  parser.add_argument("-f", "--forceRun", action='store_true')
   args = parser.parse_args()
 
   isMultithreaded = True if (args.job == "openmp" or args.job == "mpi") else False
@@ -49,6 +51,10 @@ def main():
   #########
   # Run job
   #########
+  
+  if (not args.forceRun) and os.path.isfile(saveFileName) and os.path.isfile(outputFileName):
+    print "Output files already exist.  Run with -f to force rerunning."
+    exit(0)
 
   if args.machine == "hopper":
     actualJobScript = "%s/%s -n %d -o %s" % (execDir, args.job, args.numParticles, saveFileName)
