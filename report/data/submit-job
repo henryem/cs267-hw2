@@ -3,11 +3,11 @@
 import argparse
 import os
 
-def writeScriptAndRun(script, scriptPath):
+def writeScriptAndRun(scriptRunner, script, scriptPath):
   with open(scriptPath, "w") as scriptFile:
     scriptFile.write(script)
   os.chmod(scriptPath, 0770)
-  os.system("%s" % (scriptPath))
+  os.system("%s %s" % (scriptRunner, scriptPath))
 
 def main():
   parser = argparse.ArgumentParser()
@@ -79,7 +79,7 @@ def main():
     )
     jobRunnerScriptName = "%s/jobRunner-%s" % (localTmpDir, jobName)
     print "Running ``%s'' on %s" % (actualJobScript, args.machine)
-    writeScriptAndRun(jobRunnerScript, jobRunnerScriptName)
+    writeScriptAndRun("qsub", jobRunnerScript, jobRunnerScriptName)
   
   elif args.machine == "stampede":
     actualJobScript = "./%s -n %d -o %s" % (args.job, args.numParticles, saveFileName)
@@ -100,7 +100,7 @@ def main():
     )
     jobRunnerScriptName = "%s/jobRunner-%s" % (localTmpDir, jobName)
     print "Running ``%s'' on %s" % (actualJobScript, args.machine)
-    writeScriptAndRun(jobRunnerScript, jobRunnerScriptName)
+    writeScriptAndRun("sbatch", jobRunnerScript, jobRunnerScriptName)
   
   elif args.machine == "laptop":
     os.chdir(localExecDir)
