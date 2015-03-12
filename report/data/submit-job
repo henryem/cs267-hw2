@@ -68,7 +68,7 @@ def main():
     aprun -d %d -n %d -N %d %s
     
     """ % (
-      args.processors
+      args.processors,
       args.threads,
       outputFileName,
       args.threads,
@@ -95,7 +95,7 @@ def main():
     """ % (
       args.job,
       outputFileName,
-      actualJobScript
+      actualJobScript,
       saveFileName
     )
     jobRunnerScriptName = "%s/jobRunner-%s" % (localTmpDir, jobName)
