@@ -7,7 +7,7 @@ def writeScriptAndRun(script, scriptPath):
   with open(scriptPath, "w") as scriptFile:
     scriptFile.write(script)
   os.chmod(scriptPath, 0770)
-  os.system("./%s" % (scriptPath))
+  os.system("%s" % (scriptPath))
 
 def main():
   parser = argparse.ArgumentParser()
