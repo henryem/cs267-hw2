@@ -27,7 +27,7 @@ def main():
 
   runRemotely = True if (args.machine == "hopper" or args.machine == "stampede") else False
 
-  localRoot = "%s/../.." % (os.path.dirname(os.path.realpath(__file__)))
+  localRoot = os.path.realpath("%s/../.." % (os.path.dirname(os.path.realpath(__file__))))
   remoteRoot = "~/cs267-hw2"
 
   localDataDir = "%s/report/data" % (localRoot)
