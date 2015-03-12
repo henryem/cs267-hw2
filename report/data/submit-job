@@ -1,0 +1,34 @@
+#!/usr/bin/python
+
+import argparse
+import os
+
+parser = argparse.ArgumentParser()
+parser.add_argument("-m", "--machine")
+parser.add_argument("-j", "--job")
+parser.add_argument("-t", "--threads", type=int)
+parser.add_argument("-p", "--processors", type=int)
+parser.add_argument("-n", "--numParticles", type=int)
+args = parser.parse_args()
+
+jobName = None
+if args.threads is not None:
+  jobName = "%s-%s-n%d-p%d-t%d" % (args.job, args.machine, args.numParticles, args.processors, args.threads)
+else:
+  jobName = "%s-%s-n%d" % (args.job, args.machine, args.numParticles)
+
+dataDir = os.path.dirname(os.path.realpath(__file__))
+outputFileName = "%s/%s.out" % (dataDir, jobName)
+saveFileName = "%s/%s.save" % (dataDir, jobName)
+
+if args.machine == "hopper":
+  pass
+elif args.machine == "stampede":
+  pass
+elif args.machine == "laptop":
+  os.chdir(os.path.dirname(os.path.realpath(__file__)) + "/../../particles")
+  script = "./%s -n %d -o %s > %s" % (args.job, args.numParticles, saveFileName, outputFileName)
+  print "Running ``%s''" % (script)
+  os.system(script)
+else:
+  error("unknown machine type")
