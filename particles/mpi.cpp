@@ -57,6 +57,8 @@ int main( int argc, char **argv )
         reduced_n_proc, 
         n_proc_per_side, 
         num_grid_squares_per_side_per_proc;
+    int max_outside_slot = n/10;
+    int max_boundry_slot = n/10;
 
     MPI_Init( &argc, &argv );
     MPI_Comm_size( MPI_COMM_WORLD, &n_proc );
@@ -66,10 +68,10 @@ int main( int argc, char **argv )
     //Determine if n is large
     bool LARGE = true;
 
-
-    if (n>5000){
-        LARGE = true;
-    } 
+    if (n_proc > n){
+        n_proc = n/4;
+    }  
+ 
     // Reduced processors:
     // In order to equally divide area into processors, number of processors
     // must be a square number. Here we recalculate the number of processors.
@@ -208,6 +210,7 @@ int main( int argc, char **argv )
 
     for( int step = 0; step < NSTEPS; step++ )
     {
+
         if (rank < reduced_n_proc){
 
             //1. Calculate force
@@ -254,8 +257,6 @@ int main( int argc, char **argv )
                 move( p_inside[i] );
             }
 
-            int max_outside_slot = 50;
-            int max_boundry_slot = 1000;
             // 3. Check if any particles outside boundry
             particle_t *p_buf = (particle_t*) malloc (reduced_n_proc* max_outside_slot * sizeof(particle_t));
             int p_counter[reduced_n_proc];
@@ -345,7 +346,8 @@ int main( int argc, char **argv )
 
             // 8. Redrawing grid for inside paritcle
             if (LARGE){
-                free(p_grid);
+                delete p_grid;
+                p_grid = NULL;
                 p_grid = new Grid(size, num_grid_squares_per_side);
                 for (int i = 0; i < count_inside; i++)
                 p_grid->add(p_inside[i]);
@@ -359,10 +361,15 @@ int main( int argc, char **argv )
             }
 
             free(p_buf);
+            p_buf = NULL;
             free(b_buf);
+            b_buf = NULL;
             free(receive_inside);
+            receive_inside = NULL;
             free(receive_boundry);
+            receive_boundry = NULL;
             free(boundry_proc);
+            boundry_proc = NULL;
 
         }
 
