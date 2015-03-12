@@ -57,14 +57,13 @@ def main():
     exit(0)
 
   if args.machine == "hopper":
-    actualJobScript = "%s/%s -n %d -o %s" % (execDir, args.job, args.numParticles, saveFileName)
+    actualJobScript = "%s/%s -n %d -o %s > %s" % (execDir, args.job, args.numParticles, saveFileName, outputFileName)
     jobRunnerScript = """#!/bin/bash
 #PBS -V
 #PBS -l mppwidth=%d
 #PBS -l mppdepth=%d
 #PBS -S /bin/bash
 #PBS -l walltime=0:10:00
-#PBS -o %s
 #PBS -j oe
 #PBS -A mp309
 
@@ -74,7 +73,7 @@ export OMP_NUM_THREADS=%d
 aprun -d %d -n %d -N %d %s""" % (
       args.processors,
       args.threads,
-      outputFileName,
+      # outputFileName,
       args.threads,
       args.threads,
       args.processors,
@@ -86,18 +85,17 @@ aprun -d %d -n %d -N %d %s""" % (
     writeScriptAndRun("qsub", jobRunnerScript, jobRunnerScriptName)
   
   elif args.machine == "stampede":
-    actualJobScript = "%s/%s -n %d -o %s" % (execDir, args.job, args.numParticles, saveFileName)
+    actualJobScript = "%s/%s -n %d -o %s > %s" % (execDir, args.job, args.numParticles, saveFileName, outputFileName)
     jobRunnerScript = """#!/bin/bash
 #SBATCH -J %s          	# job name
-#SBATCH -o %s       	# output and error file name
 #SBATCH -n 1             	# total number of mpi tasks requested
-#SBATCH -p gpudev     		# queue (partition) -- can use gpu or gpudev
+#SBATCH -p gpu     		# queue (partition) -- can use gpu or gpudev
 #SBATCH -t 00:10:00        	# run time (hh:mm:ss) - 10 minutes
 
 ibrun %s
 ./autocorrect -s %s""" % (
-      args.job,
-      outputFileName,
+      jobName,
+      # outputFileName,
       actualJobScript,
       saveFileName
     )
