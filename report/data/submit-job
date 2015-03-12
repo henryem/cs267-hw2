@@ -3,32 +3,113 @@
 import argparse
 import os
 
-parser = argparse.ArgumentParser()
-parser.add_argument("-m", "--machine")
-parser.add_argument("-j", "--job")
-parser.add_argument("-t", "--threads", type=int)
-parser.add_argument("-p", "--processors", type=int)
-parser.add_argument("-n", "--numParticles", type=int)
-args = parser.parse_args()
+def writeScriptAndRun(script, scriptPath):
+  with open(scriptPath, "w") as scriptFile:
+    scriptFile.write(script)
+  os.chmod(scriptPath, 0770)
+  os.system("./%s" % (scriptPath))
 
-jobName = None
-if args.threads is not None:
-  jobName = "%s-%s-n%d-p%d-t%d" % (args.job, args.machine, args.numParticles, args.processors, args.threads)
-else:
-  jobName = "%s-%s-n%d" % (args.job, args.machine, args.numParticles)
+def main():
+  parser = argparse.ArgumentParser()
+  parser.add_argument("-m", "--machine")
+  parser.add_argument("-j", "--job")
+  parser.add_argument("-t", "--threads", type=int, default=1)
+  parser.add_argument("-p", "--processors", type=int, default=1)
+  parser.add_argument("-n", "--numParticles", type=int)
+  args = parser.parse_args()
 
-dataDir = os.path.dirname(os.path.realpath(__file__))
-outputFileName = "%s/%s.out" % (dataDir, jobName)
-saveFileName = "%s/%s.save" % (dataDir, jobName)
+  isMultithreaded = True if (args.job == "openmp" or args.job == "mpi") else False
+  jobName = None
+  if isMultithreaded:
+    jobName = "%s-%s-n%d-p%d-t%d" % (args.job, args.machine, args.numParticles, args.processors, args.threads)
+  else:
+    jobName = "%s-%s-n%d" % (args.job, args.machine, args.numParticles)
 
-if args.machine == "hopper":
-  pass
-elif args.machine == "stampede":
-  pass
-elif args.machine == "laptop":
-  os.chdir(os.path.dirname(os.path.realpath(__file__)) + "/../../particles")
-  script = "./%s -n %d -o %s > %s" % (args.job, args.numParticles, saveFileName, outputFileName)
-  print "Running ``%s''" % (script)
-  os.system(script)
-else:
-  error("unknown machine type")
+  runRemotely = True if (args.machine == "hopper" or args.machine == "stampede") else False
+
+  localRoot = "%s/../.." % (os.path.dirname(os.path.realpath(__file__)))
+  remoteRoot = "~/cs267-hw2"
+
+  localDataDir = "%s/report/data" % (localRoot)
+  remoteDataDir = "%s/report/data" % (remoteRoot)
+  dataDir = remoteDataDir if runRemotely else localDataDir
+
+  outputFileName = "%s/%s.out" % (dataDir, jobName)
+  saveFileName = "%s/%s.save" % (dataDir, jobName)
+
+  localTmpDir = "%s/tmp" % (localDataDir)
+  remoteTmpDir = "%s/tmp" % (localDataDir)
+  tmpDir = remoteTmpDir if runRemotely else localTmpDir
+
+  localExecDir = "%s/particles" % (localRoot)
+  remoteExecDir = "%s/particles" % (remoteRoot)
+  execDir = remoteExecDir if runRemotely else localExecDir
+
+
+  #########
+  # Run job
+  #########
+
+  if args.machine == "hopper":
+    actualJobScript = "./%s -n %d -o %s" % (args.job, args.numParticles, saveFileName)
+    jobRunnerScript = """#!/bin/bash
+    #PBS -V
+    #PBS -l mppwidth=%d
+    #PBS -l mppdepth=%d
+    #PBS -S /bin/bash
+    #PBS -l walltime=0:10:00
+    #PBS -o %s
+    #PBS -j oe
+    #PBS -A mp309
+
+    cd $PBS_O_WORKDIR
+
+    export OMP_NUM_THREADS=%d
+    aprun -d %d -n %d -N %d %s
+    
+    """ % (
+      args.processors
+      args.threads,
+      outputFileName,
+      args.threads,
+      args.threads,
+      args.processors,
+      args.processors,
+      actualJobScript
+    )
+    jobRunnerScriptName = "%s/jobRunner-%s" % (localTmpDir, jobName)
+    print "Running ``%s'' on %s" % (actualJobScript, args.machine)
+    writeScriptAndRun(jobRunnerScript, jobRunnerScriptName)
+  
+  elif args.machine == "stampede":
+    actualJobScript = "./%s -n %d -o %s" % (args.job, args.numParticles, saveFileName)
+    jobRunnerScript = """#!/bin/bash
+    #SBATCH -J %s          	# job name
+    #SBATCH -o %s       	# output and error file name
+    #SBATCH -n 1             	# total number of mpi tasks requested
+    #SBATCH -p gpudev     		# queue (partition) -- can use gpu or gpudev
+    #SBATCH -t 00:10:00        	# run time (hh:mm:ss) - 10 minutes
+
+    ibrun %s
+    ./autocorrect -s %s
+    """ % (
+      args.job,
+      outputFileName,
+      actualJobScript
+      saveFileName
+    )
+    jobRunnerScriptName = "%s/jobRunner-%s" % (localTmpDir, jobName)
+    print "Running ``%s'' on %s" % (actualJobScript, args.machine)
+    writeScriptAndRun(jobRunnerScript, jobRunnerScriptName)
+  
+  elif args.machine == "laptop":
+    os.chdir(localExecDir)
+    script = "./%s -n %d -o %s > %s" % (args.job, args.numParticles, saveFileName, outputFileName)
+    print "Running ``%s''" % (script)
+    os.system(script)
+  
+  else:
+    error("unknown machine type")
+
+if __name__ == "__main__":
+  main()
