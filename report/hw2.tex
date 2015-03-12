@@ -92,16 +92,16 @@
 
 \section{Serial Implementation}
 % Describe algorithm: Grid data structure
-% Plot: O(n) scaling
-% Plot: Compare with serial-naive
-% Plot: Hopper versus laptop
+% Plot: O(n) scaling: n = 250, 1000, 4000, 16000, 64000, 256000
+% Plot: Compare with serial-naive: n = 100, 200, 400, 800, 1600, 3200, 6400, 12800
+% Plot: Hopper versus laptop: n = 250, 1000, 4000, 16000, 64000, 256000
 
 \section{OpenMP Implementation}
 % Describe algorithm: Grid data structure; threads handle subgrids; communication between threads is implicit and of size O(particles that moved across subgrid boundaries)
 % Describe synchronization: Locking on grid inserts (monotonic operation) plus barriers before/after reads.
-% Plot: O(n) scaling on Hopper: n = 1000, 4000, 16000, 64000, 256000
-% Plot: Weak scaling(?) on Hopper: p = 1, 2, 4, 8, 16, 24; n = 1000, 4000, 16000, 64000 (* number of cores) [use more / less if possible on Hopper]
-% Plot: Strong scaling(?) on Hopper: p = 1, 2, 4, 8, 16, 24; n = 1000, 4000, 16000, 64000
+% Plot: O(n) scaling on Hopper: n = 250, 1000, 4000, 16000, 64000, 256000
+% Plot: Weak scaling(?) on Hopper: p = 1, 2, 4, 8, 16, 24; n = 250, 1000, 4000, 16000, 64000 (* number of cores) [use more / less if possible on Hopper]
+% Plot: Strong scaling(?) on Hopper: p = 1, 2, 4, 8, 16, 24; n = 250, 1000, 4000, 16000, 64000, 256000
 
 \section{MPI Implementation}
 % Plot: O(n) scaling on Hopper: n = 1000, 4000, 16000, 64000, 256000
@@ -112,8 +112,8 @@
 \section{CUDA Implementation}
 % Describe algorithm.
 % Describe sorting algorithm and plans for future work.
-% Plot: O(n) scaling on Stampede: n = 1000, 4000, 16000, 64000, 256000, 1024000, 4096000
-% Plot: Laptop versus Stampede: n = 1000, 4000, 16000, 64000, 256000, 1024000, 4096000 [last two on Stampede only due to memory constraints]
+% Plot: O(n) scaling on Stampede: n = 250, 1000, 4000, 16000, 64000, 256000, 1024000, 4096000
+% Plot: Laptop versus Stampede: n = 250, 1000, 4000, 16000, 64000, 256000, 1024000, 4096000 [last two on Stampede only due to memory constraints]
 
 \section{Observations}
 
