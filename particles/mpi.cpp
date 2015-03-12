@@ -61,15 +61,15 @@ int main( int argc, char **argv )
     MPI_Init( &argc, &argv );
     MPI_Comm_size( MPI_COMM_WORLD, &n_proc );
     MPI_Comm_rank( MPI_COMM_WORLD, &rank );
+
    
     //Determine if n is large
-    bool LARGE = false;
+    bool LARGE = true;
 
 
     if (n>5000){
         LARGE = true;
-    }    
-
+    } 
     // Reduced processors:
     // In order to equally divide area into processors, number of processors
     // must be a square number. Here we recalculate the number of processors.
@@ -169,13 +169,12 @@ int main( int argc, char **argv )
             }
         } 
 
+
         MPI_Request request, request2;
         for (int i = 0; i< reduced_n_proc; i++){
             MPI_Isend(&p_buf[i*n],p_counter[i],PARTICLE,i,0,MPI_COMM_WORLD, &request);   // Using tag value 0 to indicate it's particle inside the processor
             MPI_Isend(&b_buf[i*n],b_counter[i],PARTICLE,i,1,MPI_COMM_WORLD, &request2);  // Using tag value 1 to indicate it's particle at the boundry of processor
         }
-        free(p_buf);
-        free(b_buf);
     }
   
     Stats local_stats;
@@ -195,16 +194,14 @@ int main( int argc, char **argv )
     particle_t *p_inside = (particle_t *) malloc(n*sizeof(particle_t));
     particle_t *p_boundry = (particle_t *) malloc(n*sizeof(particle_t));
 
+
     if (rank < reduced_n_proc){
         MPI_Status status, status2;
-
         MPI_Recv(p_inside,n,PARTICLE,0,0,MPI_COMM_WORLD,&status);
         MPI_Recv(p_boundry,n,PARTICLE,0,1,MPI_COMM_WORLD,&status2);
-        
         MPI_Get_count(&status, PARTICLE,&count_inside);
         MPI_Get_count(&status2, PARTICLE,&count_boundry);
     }
-
     if (LARGE){
         p_grid->add(p_inside[i]);
     }
@@ -212,6 +209,7 @@ int main( int argc, char **argv )
     for( int step = 0; step < NSTEPS; step++ )
     {
         if (rank < reduced_n_proc){
+
             //1. Calculate force
             for (int i = 0; i< count_inside; i++){
                 particle_t& p = p_inside[i];
@@ -250,26 +248,28 @@ int main( int argc, char **argv )
                 }
 
             }
+
             // 2. Move the particles
             for( int i = 0; i < count_inside; i++ ){
                 move( p_inside[i] );
             }
 
+            int max_outside_slot = 50;
+            int max_boundry_slot = 1000;
             // 3. Check if any particles outside boundry
-            particle_t *p_buf = (particle_t*) malloc (reduced_n_proc* n * sizeof(particle_t));
+            particle_t *p_buf = (particle_t*) malloc (reduced_n_proc* max_outside_slot * sizeof(particle_t));
             int p_counter[reduced_n_proc];
             for (int i = 0; i< reduced_n_proc; i++){
                 p_counter[i] = 0;
             }
 
-            particle_t *b_buf = (particle_t*) malloc (reduced_n_proc * n * sizeof(particle_t));
+            particle_t *b_buf = (particle_t*) malloc (reduced_n_proc * max_boundry_slot * sizeof(particle_t));
             int b_counter[reduced_n_proc];
             int max_case = 3;
             int *boundry_proc = (int *) malloc (max_case* sizeof(int));
             for (int i = 0; i< reduced_n_proc; i++){
                 b_counter[i] = 0;
             }
-
             //Calculate which particles are going to send out to other processor
             for (int i = 0; i < count_inside; i++){
 
@@ -277,7 +277,7 @@ int main( int argc, char **argv )
                 int current_proc_no = find_proc_no(p_inside[i], reduced_n_proc, partition_grids, grid_square_size); 
                 // The particle is outside the processor
                 if (current_proc_no != rank){
-                    p_buf[current_proc_no*n+p_counter[current_proc_no]] = p_inside[i];
+                    p_buf[current_proc_no*max_outside_slot+p_counter[current_proc_no]] = p_inside[i];
                     p_counter[current_proc_no] +=1;
                     p_inside[i].x = -1;
                     p_inside[i].y = -1;
@@ -289,12 +289,14 @@ int main( int argc, char **argv )
                     count = find_boundry_proc(p_inside[i], reduced_n_proc, partition_grids, grid_square_size, boundry_proc,num_grid_squares_per_side);
                     for (int j = 0; j<count; j++){
                         int proc_no = boundry_proc[j];
-                        b_buf[proc_no*n+b_counter[proc_no]] = p_inside[i];
+                        b_buf[proc_no*max_boundry_slot+b_counter[proc_no]] = p_inside[i];
                         b_counter[proc_no] +=1;
+
                     }
 
                 }
             }
+
             // 4. Removing particles that ran outside
             for (int i = 0; i< count_inside; i++){
                 if (p_inside[i].x == -1 && p_inside[i].y == -1){
@@ -303,37 +305,38 @@ int main( int argc, char **argv )
                     i -=1;
                 }
             }
-            // 5. Sending out the particles info to other processor
             MPI_Request request, request2;
             for (int i = 0; i< reduced_n_proc; i++){
-                MPI_Isend(&p_buf[i*n],p_counter[i],PARTICLE,i,0,MPI_COMM_WORLD, &request);   // Using tag value 0 to indicate it's particle inside the processor
-                MPI_Isend(&b_buf[i*n],b_counter[i],PARTICLE,i,1,MPI_COMM_WORLD, &request2);  // Using tag value 1 to indicate it's particle at the boundry of processor
-            }   
 
 
+                MPI_Isend(&p_buf[i*max_outside_slot],p_counter[i],PARTICLE,i,0,MPI_COMM_WORLD, &request);   // Using tag value 0 to indicate it's particle inside the processor
+                MPI_Isend(&b_buf[i*max_boundry_slot],b_counter[i],PARTICLE,i,1,MPI_COMM_WORLD, &request2);  // Using tag value 1 to indicate it's particle at the boundry of processor
+            } 
             // 6. Receiving particles info from other processor
             MPI_Status status, status2;
             // Each processor receive particles from processor zero.
             int total_count_inside = 0;
             int total_count_boundry = 0;
 
-            particle_t *receive_inside = (particle_t *) malloc(n*sizeof(particle_t));
-            particle_t *receive_boundry = (particle_t *) malloc(n*sizeof(particle_t));
+            particle_t *receive_inside = (particle_t *) malloc(max_outside_slot*reduced_n_proc*sizeof(particle_t));
+            particle_t *receive_boundry = (particle_t *) malloc(max_boundry_slot*reduced_n_proc*sizeof(particle_t));
 
 
             for (int i = 0; i < reduced_n_proc; i++){
+
+
                 int receive_count_inside = 0; 
                 int receive_count_boundry = 0;
-                MPI_Recv(&receive_inside[total_count_inside],n,PARTICLE,i,0,MPI_COMM_WORLD,&status);
-                MPI_Recv(&receive_boundry[total_count_boundry],n,PARTICLE,i,1,MPI_COMM_WORLD,&status2);
+                MPI_Recv(&receive_inside[total_count_inside],max_outside_slot,PARTICLE,i,0,MPI_COMM_WORLD,&status);
+                MPI_Recv(&receive_boundry[total_count_boundry],max_boundry_slot,PARTICLE,i,1,MPI_COMM_WORLD,&status2);
             
                 MPI_Get_count(&status, PARTICLE,&receive_count_inside);
                 MPI_Get_count(&status2, PARTICLE,&receive_count_boundry);
              
                 total_count_inside += receive_count_inside;
                 total_count_boundry += receive_count_boundry;
-            }
 
+            }
             // 7. Update internal particle information
             for (int i = 0; i < total_count_inside; i++){
                 p_inside[count_inside] = receive_inside[i];
