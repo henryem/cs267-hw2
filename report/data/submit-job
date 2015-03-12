@@ -51,7 +51,7 @@ def main():
   #########
 
   if args.machine == "hopper":
-    actualJobScript = "./%s -n %d -o %s" % (args.job, args.numParticles, saveFileName)
+    actualJobScript = "%s/%s -n %d -o %s" % (execDir, args.job, args.numParticles, saveFileName)
     jobRunnerScript = """#!/bin/bash
     #PBS -V
     #PBS -l mppwidth=%d
@@ -82,7 +82,7 @@ def main():
     writeScriptAndRun("qsub", jobRunnerScript, jobRunnerScriptName)
   
   elif args.machine == "stampede":
-    actualJobScript = "./%s -n %d -o %s" % (args.job, args.numParticles, saveFileName)
+    actualJobScript = "%s/%s -n %d -o %s" % (execDir, args.job, args.numParticles, saveFileName)
     jobRunnerScript = """#!/bin/bash
     #SBATCH -J %s          	# job name
     #SBATCH -o %s       	# output and error file name
