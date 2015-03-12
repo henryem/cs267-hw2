@@ -63,17 +63,18 @@ NVCC_LIBS = -lm
 OWN_LIBS = common.o Grid.o Stats.o $(OWN_PTHREAD_BARRIER_LIB)
 OWN_OMP_LIBS = $(OWN_LIBS) OmpThreadsafeGrid.o
 
-TARGETS = serial autograder tests openmp mpi
+TARGETS = serial serial-naive autograder tests openmp mpi
 ifdef SUPPORTS_GPU
   TARGETS += gpu gpu-naive
 endif
-#pthreads
 
 all:	$(TARGETS)
 
 tests: tests.o Grid.o
 	$(CC) $(CFLAGS) -o $@ tests.o Grid.o $(LIBS)
 serial: serial.o $(OWN_LIBS)
+	$(CC) $(CFLAGS) -o $@ $^ $(LIBS)
+serial-naive: serial-naive.o $(OWN_LIBS)
 	$(CC) $(CFLAGS) -o $@ $^ $(LIBS)
 autograder: autograder.o $(OWN_LIBS)
 	$(CC) $(CFLAGS) -o $@ $^ $(LIBS)
@@ -98,6 +99,8 @@ autograder.o: autograder.cpp $(OWN_LIBS)
 openmp.o: openmp.cpp $(OWN_OMP_LIBS)
 	$(CC) -c $(OPENMP) $(CFLAGS) $<
 serial.o: serial.cpp $(OWN_LIBS)
+	$(CC) -c $(CFLAGS) $<
+serial-naive.o: serial-naive.cpp $(OWN_LIBS)
 	$(CC) -c $(CFLAGS) $<
 pthreads.o: pthreads.cpp $(OWN_LIBS)
 	$(CC) -c $(CFLAGS) $<
