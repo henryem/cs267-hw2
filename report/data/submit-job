@@ -94,9 +94,10 @@ aprun -d %d -n %d -N %d %s""" % (
 #SBATCH -t 00:10:00        	# run time (hh:mm:ss) - 10 minutes
 
 ibrun %s
-./autocorrect -s %s""" % (
+%s/autocorrect -s %s""" % (
       jobName,
       actualJobScript,
+      execDir,
       saveFileName
     )
     jobRunnerScriptName = "%s/jobRunner-%s" % (localTmpDir, jobName)
