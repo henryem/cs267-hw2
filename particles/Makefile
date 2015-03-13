@@ -89,10 +89,19 @@ gpu: gpu.o common_gpu.o Stats.o
 	$(NVCC) -o $@ $(NVCCLIBS) gpu.o common_gpu.o Stats.o
 gpu-naive: gpu_naive.o common_gpu.o Stats.o
 	$(NVCC) -o $@ $(NVCCLIBS) gpu_naive.o common_gpu.o Stats.o
+.PHONY: grading-package
+grading-package: hw2.tgz
 
-# Load CUDA using the following command
-# module load cuda
-
+hw2.tgz: serial openmp mpi gpu hw2.pdf
+	tar cvzf $@ *.cpp *.hpp *.h *.cu Makefile hw2.pdf
+	@echo "Testing the grading package..."
+	mkdir tmp-grading-package
+	cp $@ tmp-grading-package
+	cd tmp-grading-package && tar xvzf $@ && make serial openmp mpi gpu
+	rm -rf tmp-grading-package
+hw2.pdf: ../report/hw2.pdf
+	cp ../report/hw2.pdf hw2.pdf
+	
 pthread_barrier.o: pthread_barrier.cpp pthread_barrier.h
 	$(CC) -c $(CFLAGS) $<
 autograder.o: autograder.cpp $(OWN_LIBS)
@@ -123,4 +132,4 @@ common_gpu.o: common.cpp common.h
 	$(CC) -c $(CFLAGS) $<
 
 clean:
-	rm -f *.o $(TARGETS) *.stdout *.txt
+	rm -f *.o $(TARGETS) *.stdout *.txt hw2.tgz
