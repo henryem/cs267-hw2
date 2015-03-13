@@ -54,8 +54,8 @@ def main():
   # Run job
   #########
   
-  if (not args.forceRun) and os.path.isfile(saveFileName) and os.path.isfile(outputFileName):
-    print "Output files already exist.  Run with -f to force rerunning."
+  if (not args.forceRun) and os.path.isfile(outputFileName):
+    print "Output file already exists.  Run with -f to force rerunning."
     exit(0)
 
   actualJobScript = "%s/%s -n %d -o %s %s > %s" % (execDir, args.job, args.numParticles, saveFileName, runSlowOpt, outputFileName)  
