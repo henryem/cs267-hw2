@@ -284,6 +284,7 @@ int main( int argc, char **argv )
     printf( "-h to see this help\n" );
     printf( "-n <int> to set the number of particles\n" );
     printf( "-o <filename> to specify the output file name\n" );
+    printf( "-no turns off all correctness checks and particle output\n");
     return 0;
   }
 
@@ -292,7 +293,7 @@ int main( int argc, char **argv )
   const char *savename = read_string( argc, argv, "-o", NULL );
   const char *sumname = read_string( argc, argv, "-s", NULL );
 
-  FILE *fsave = savename ? fopen( savename, "w" ) : NULL;
+  FILE *fsave = ((!fast) && savename) ? fopen( savename, "w" ) : NULL;
   const double size = set_size( n );
 
   // Particles are stored in a flattened array of squares.  Each square

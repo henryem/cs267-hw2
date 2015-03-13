@@ -88,14 +88,16 @@ int main( int argc, char **argv )
     printf( "-h to see this help\n" );
     printf( "-n <int> to set the number of particles\n" );
     printf( "-o <filename> to specify the output file name\n" );
+    printf( "-no turns off all correctness checks and particle output\n");
     return 0;
   }
 
   int n = read_int( argc, argv, "-n", 1000 );
 
   char *savename = read_string( argc, argv, "-o", NULL );
-
-  FILE *fsave = savename ? fopen( savename, "w" ) : NULL;
+  
+  bool fast = (find_option( argc, argv, "-no" ) != -1);
+  FILE *fsave = ((!fast) && savename) ? fopen( savename, "w" ) : NULL;
 
   const double size = set_size( n );
   particle_t *particles = init_particles(n);
@@ -136,7 +138,7 @@ int main( int argc, char **argv )
     //
     //  save if necessary
     //
-    if( fsave && (step%SAVEFREQ) == 0 ) {
+    if(fsave && (step%SAVEFREQ) == 0 ) {
       // Copy the particles back to the CPU
       cudaMemcpy(particles, d_particles, n * sizeof(particle_t), cudaMemcpyDeviceToHost);
       save( fsave, n, particles);
