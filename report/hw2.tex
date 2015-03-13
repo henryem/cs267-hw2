@@ -9,6 +9,9 @@
 
 % Some functions for general use.
 
+\newcommand{\code}[1]%
+  {\texttt{#1}}
+
 \def\seqn#1\eeqn{\begin{align}#1\end{align}}
 
 \newcommand{\vecName}[1]%
@@ -89,14 +92,64 @@
 \maketitle
 
 \section{Introduction}
+For this assignment, we have implemented several versions of a 2D particle simulator.  We describe our implementations and their performance, and close with some comments.  First, let us describe the problem and a general framework for solutions.
+
+We simulate a system of particles interacting in a 2D square box.  Particles can bounce off each other or the walls of the box.  The size of the box is scaled so that the average density of particles is constant as the number of particles, $n$, increases.  The particles are initialized with bounded random velocity.
+
+The simulator for this assignment discretizes time into $T = 1000$ time steps and defines inter-particle interactions such that each particle interacts only with other particles within a bounded radius on each time step.  On each time step, it uses a two-step algorithm: First, forces from other nearby particles determine the particle's acceleration.  Then, each particle moves according to its current acceleration and velocity, bouncing inelastically off walls as necessary.  We call the first step ``interaction'' and the second step ``movement''.
+
+Our goal is to implement this simulation algorithm as quickly as possible, either by eliminating unnecessary work or by parallelizing the computation across $p$ hardware threads.  Clearly a lower bound on running time is $O(T n / p)$, since each particle must be touched on each time step.  Movement takes $O(n)$ time and is perfectly parallel.  (For that reason, we will not discuss how we implement the movement step, except where it could be unclear.)  However, a naive algorithm does $O(n^2)$ work in the interaction step, and it is unclear how to parallelize it efficiently.
+
+The general trick for speeding up the interaction step will be to maintain a data structure that allows us to query only a small number of nearby particles (say $K$) for each particle in the second step, reducing the running time to $O(Kn)$.  If $K$ is constant, then we have achieved $O(n)$ running time, which is the best asymptotic running time for this problem (assuming we must implement the simulation algorithm exactly, up to reordering floating-point operations).  To parallelize the interaction step, we must ensure that these $Kn$ queries do not involve too much communication, and that we can parallelize the maintenance of the data structure itself.  There is a generic data structure to solve the former problem, so often the difficult part is maintaining the data structure efficiently.
+
+\subsection{Experimental setup}
+We run our experiments in three different computing environments.  Most experiments are run on the Hopper cluster.  Experiments on GPUs are run on Stampede nodes.  When noted, we also run experiments on a Mid-2012 Macbook Pro, which has an NVIDIA GeForce GT 650M GPU with 1GB of memory and a 2.3 GHz Core i7 CPU.
 
 \section{Serial Implementation}
-% Describe algorithm: Grid data structure
-% Plot: O(n) scaling: n = 250, 1000, 4000, 16000, 64000, 256000
-% Plot: Compare with serial-naive: n = 100, 200, 400, 800, 1600, 3200, 6400, 12800
-% Plot: Hopper versus laptop: n = 250, 1000, 4000, 16000, 64000, 256000
+Our serial implementation uses a grid data structure to execute the interaction step in $O(n)$ time.  The box is divided into $O(n)$ equal squares (approximately $n$ squares in our implementation), which are large enough that a particle can only interact with particles in its own square and its 8 neighboring squares on a single iteration.  Squares are stored in a flat vector in column-major order, and each square contains a pointer to a vector of pointers to the particles it currently contains.  In the interaction step, each particle only needs to be checked for interactions with particles in 9 squares; since the number of particles per square is bounded (and equal to 1 on average), the interaction step takes $O(n)$ time.  After the movement step, particles must be mapped to new grid squares, so we simply build a new grid serially, which takes $O(n)$ time.
+
+\subsection{Results}
+Figure \ref{fig:serial-on} shows that our algorithm indeed enjoys linear ($O(n)$) scaling.  For comparison, Figure \ref{fig:serial-naive} shows the performance of the naive $O(n^2)$ algorithm on smaller problems.
+
+We also ran our experiments on our laptop, and the laptop runs the serial code faster than the Hopper nodes, which are not designed for serial performance.  Figure \ref{fig:serial-laptop} shows the results; the laptop does slightly outperform Hopper.
 
 \section{OpenMP Implementation}
+Our OpenMP implementation uses a similar grid data structure.  To maximize cache locality, each thread is assigned a block of grid squares whose particles' accelerations it must compute in the interaction step.  With this scheme, a thread needs only read particles from its own squares and from squares bordering its block.  The grid itself is also built in parallel.  After movement, each thread inserts into a new shared grid data structure all the particles that were in its block before movement.  Each square uses a separate \code{omp\_lock\_t} to ensure that inserts are atomic.
+
+In principle, we should use a block structure that minimizes the maximum border size.  If $p$ is a perfect square, an optimal block structure consists of squares of grid squares; since there are $O(n)$ total squares, the maximum border size is $O((n/p)^{1/2})$.  However, due to time constraints, we used a less efficient block structure, just a range of grid squares in column major order.  This results in a larger border size of $O(\min(n/p, \sqrt{n}))$.
+
+\subsection{Synchronization}
+Finally, let us describe the details of synchronization in this algorithm.  In pseudocode, the algorithm looks like this:
+
+\begin{verbatim}
+particle_t* particles = makeSystem() # O(n), done on 1 thread
+Grid oldGrid
+Grid newGrid = buildInitially(particles) # O(n), done on 1 thread
+for i in range(1, T):
+  barrier()
+  oldGrid = newGrid # O(1), done on 1 thread
+  newGrid = new Grid() # O(1), done on 1 thread
+  barrier()
+  insertIntoGrid(oldGrid, newGrid) # Done in parallel using locks
+  barrier()
+  simulateInteractions(newGrid) # Done in parallel
+  barrier()
+  simulateMovements(newGrid) # Done in parallel
+\end{verbatim}
+
+\begin{description}
+  \item[Interactions:] Since each particle's acceleration is written by only a single thread in the \code{simulateInteractions} step, no synchronization is required within that step.
+  \item[Building the grid:] \code{insertIntoGrid} does require synchronization, since a grid square can have particles inserted into it by multiple threads at once.  We use fine-grained locking on inserts using a separate \code{omp\_lock\_t} for each grid square.
+  
+  There is a potential problem with our implementation here: The OMP spec says that locked sections are protected by global memory barriers, when we really only want a memory barrier on the grid square that has been locked.  This means that the OMP runtime may do much more communication than necessary when running our algorithm.  Our implementation has performance problems that could be caused by this.  If we had more time, we would investigate whether this was the cause.
+  
+  Note that we always insert into a new copy of the grid, rather than moving particles within a grid.  The latter approach would be vulnerable to race conditions without careful synchronization, since it involves mixed deletes and inserts of particles.  Using a new grid ensures that \code{insertIntoGrid} is a monotonic operation, which makes it relatively easy to parallelize.  
+  \item[Movements:] A barrier is required between \code{simulateInteractions} and \code{simulateMovements} to ensure that particles in a thread's border do not move before it can include them in an interaction.
+  \item[Initialization:] The initialization step takes $O(n)$ time and is not parallelized.  The assignment says this is okay, but in a real system we would want to parallelize this step.
+\end{description}
+
+\subsection{Results}
+%synchronization
 % Describe algorithm: Grid data structure; threads handle subgrids; communication between threads is implicit and of size O(particles that moved across subgrid boundaries)
 % Describe synchronization: Locking on grid inserts (monotonic operation) plus barriers before/after reads.
 % Plot: O(n) scaling on Hopper: n = 250, 1000, 4000, 16000, 64000, 256000
