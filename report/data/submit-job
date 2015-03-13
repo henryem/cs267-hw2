@@ -58,8 +58,10 @@ def main():
     print "Output files already exist.  Run with -f to force rerunning."
     exit(0)
 
+  actualJobScript = "%s/%s -n %d -o %s %s > %s" % (execDir, args.job, args.numParticles, saveFileName, runSlowOpt, outputFileName)  
+  print "Running ``%s'' on %s" % (actualJobScript, args.machine)
+    
   if args.machine == "hopper":
-    actualJobScript = "%s/%s -n %d -o %s %s > %s" % (execDir, args.job, args.numParticles, saveFileName, runSlowOpt, outputFileName)
     jobRunnerScript = """#!/bin/bash
 #PBS -V
 #PBS -l mppwidth=%d
@@ -82,11 +84,9 @@ aprun -d %d -n %d -N %d %s""" % (
       actualJobScript
     )
     jobRunnerScriptName = "%s/jobRunner-%s" % (localTmpDir, jobName)
-    print "Running ``%s'' on %s" % (actualJobScript, args.machine)
     writeScriptAndRun("qsub", jobRunnerScript, jobRunnerScriptName)
   
   elif args.machine == "stampede":
-    actualJobScript = "%s/%s -n %d -o %s > %s" % (execDir, args.job, args.numParticles, saveFileName, outputFileName)
     jobRunnerScript = """#!/bin/bash
 #SBATCH -J %s          	# job name
 #SBATCH -n 1             	# total number of mpi tasks requested
@@ -101,14 +101,10 @@ ibrun %s
       saveFileName
     )
     jobRunnerScriptName = "%s/jobRunner-%s" % (localTmpDir, jobName)
-    print "Running ``%s'' on %s" % (actualJobScript, args.machine)
     writeScriptAndRun("sbatch", jobRunnerScript, jobRunnerScriptName)
   
   elif args.machine == "laptop":
-    os.chdir(localExecDir)
-    script = "./%s -n %d -o %s %s > %s" % (args.job, args.numParticles, saveFileName, runSlowOpt, outputFileName)
-    print "Running ``%s''" % (script)
-    os.system(script)
+    os.system(actualJobScript)
   
   else:
     error("unknown machine type")
