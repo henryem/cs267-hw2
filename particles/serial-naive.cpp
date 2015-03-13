@@ -28,9 +28,9 @@ int main( int argc, char **argv )
     char *savename = read_string( argc, argv, "-o", NULL );
     char *sumname = read_string( argc, argv, "-s", NULL );
     
-    FILE *fsave = savename ? fopen( savename, "w" ) : NULL;
+    bool fast = (find_option( argc, argv, "-no" ) != -1);
+    FILE *fsave = ((!fast) && savename) ? fopen( savename, "w" ) : NULL;
     FILE *fsum = sumname ? fopen ( sumname, "a" ) : NULL;
-
 
     Stats overall_stats;
     const double size = set_size(n);
