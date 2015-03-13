@@ -31,7 +31,7 @@ int main(int argc, char **argv) {
   const int num_threads_override = read_int( argc, argv, "-p", 0);
 
 
-  FILE *fsave = savename ? fopen( savename, "w" ) : NULL;
+  FILE *fsave = ((!fast) && savename) ? fopen( savename, "w" ) : NULL;
   FILE *fsum = sumname ? fopen ( sumname, "a" ) : NULL;
 
   const double size = set_size( n );
