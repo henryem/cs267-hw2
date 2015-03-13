@@ -18,6 +18,7 @@ def main():
   parser.add_argument("-p", "--processors", type=int, default=1)
   parser.add_argument("-n", "--numParticles", type=int)
   parser.add_argument("-f", "--forceRun", action='store_true')
+  parser.add_argument("-x", "--runSlow", action='store_true')
   args = parser.parse_args()
 
   isMultithreaded = True if (args.job == "openmp" or args.job == "mpi") else False
@@ -47,6 +48,7 @@ def main():
   remoteExecDir = "%s/particles" % (remoteRoot)
   execDir = remoteExecDir if runRemotely else localExecDir
 
+  runSlowOpt = "" if args.runSlow else "-no"
 
   #########
   # Run job
@@ -57,7 +59,7 @@ def main():
     exit(0)
 
   if args.machine == "hopper":
-    actualJobScript = "%s/%s -n %d -o %s > %s" % (execDir, args.job, args.numParticles, saveFileName, outputFileName)
+    actualJobScript = "%s/%s -n %d -o %s %s > %s" % (execDir, args.job, args.numParticles, saveFileName, runSlowOpt, outputFileName)
     jobRunnerScript = """#!/bin/bash
 #PBS -V
 #PBS -l mppwidth=%d
@@ -73,7 +75,6 @@ export OMP_NUM_THREADS=%d
 aprun -d %d -n %d -N %d %s""" % (
       args.processors,
       args.threads,
-      # outputFileName,
       args.threads,
       args.threads,
       args.processors,
@@ -95,7 +96,6 @@ aprun -d %d -n %d -N %d %s""" % (
 ibrun %s
 ./autocorrect -s %s""" % (
       jobName,
-      # outputFileName,
       actualJobScript,
       saveFileName
     )
@@ -105,7 +105,7 @@ ibrun %s
   
   elif args.machine == "laptop":
     os.chdir(localExecDir)
-    script = "./%s -n %d -o %s > %s" % (args.job, args.numParticles, saveFileName, outputFileName)
+    script = "./%s -n %d -o %s %s > %s" % (args.job, args.numParticles, saveFileName, runSlowOpt, outputFileName)
     print "Running ``%s''" % (script)
     os.system(script)
   
