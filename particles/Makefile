@@ -68,6 +68,9 @@ TARGETS = serial serial-naive autograder tests openmp mpi
 ifdef SUPPORTS_GPU
   TARGETS += gpu gpu-naive
 endif
+CLEAN_TARGETS = $(TARGETS) $(HW_NAME).tar.gz report.pdf
+
+HW_NAME = 27_hw2
 
 all:	$(TARGETS)
 
@@ -90,17 +93,23 @@ gpu: gpu.o common_gpu.o Stats.o
 gpu-naive: gpu_naive.o common_gpu.o Stats.o
 	$(NVCC) -o $@ $(NVCCLIBS) gpu_naive.o common_gpu.o Stats.o
 .PHONY: grading-package
-grading-package: hw2.tgz
+grading-package: $(HW_NAME).tar.gz
 
-hw2.tgz: serial openmp mpi gpu hw2.pdf
-	tar cvzf $@ *.cpp *.hpp *.h *.cu Makefile hw2.pdf
+$(HW_NAME).tar.gz: serial openmp mpi gpu report.pdf members.txt
+	mkdir part1
+	cp *.cpp *.hpp *.h *.cu Makefile part1
+	mkdir part2
+	cp *.cpp *.hpp *.h *.cu Makefile part2
+	tar cvzf $@ part1/* part2/* report.pdf members.txt
+	rm -rf part1
+	rm -rf part2
 	@echo "Testing the grading package..."
 	mkdir tmp-grading-package
 	cp $@ tmp-grading-package
-	cd tmp-grading-package && tar xvzf $@ && make serial openmp mpi gpu
+	cd tmp-grading-package && tar xvzf $@ && make -C part1 serial openmp mpi && make -C part2 gpu
 	rm -rf tmp-grading-package
-hw2.pdf: ../report/hw2.pdf
-	cp ../report/hw2.pdf hw2.pdf
+report.pdf: ../report/hw2.pdf
+	cp ../report/hw2.pdf report.pdf
 	
 pthread_barrier.o: pthread_barrier.cpp pthread_barrier.h
 	$(CC) -c $(CFLAGS) $<
@@ -132,4 +141,4 @@ common_gpu.o: common.cpp common.h
 	$(CC) -c $(CFLAGS) $<
 
 clean:
-	rm -f *.o $(TARGETS) *.stdout *.txt hw2.tgz
+	rm -f *.o $(CLEAN_TARGETS) *.stdout *.txt hw2.tgz
