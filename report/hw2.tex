@@ -84,8 +84,52 @@
 \item[\hskip \labelsep {\bfseries #1}]}{\end{trivlist}}
 
 \begin{filecontents}{\jobname.bib}
-%@book{foo
-%}
+@inproceedings{graphlab,
+  title = {GraphLab: A New Parallel Framework for Machine Learning},
+  author = {Yucheng Low and
+            Joseph Gonzalez and
+            Aapo Kyrola and
+            Danny Bickson and
+            Carlos Guestrin and
+            Joseph M. Hellerstein},
+  booktitle = {Conference on Uncertainty in Artificial Intelligence (UAI)},
+  month = {July},
+  year = {2010}
+}
+@inproceedings{graphx,
+  title={Graphx: A resilient distributed graph system on spark},
+  author={Xin, Reynold S and Gonzalez, Joseph E and Franklin, Michael J and Stoica, Ion},
+  booktitle={First International Workshop on Graph Data Management Experiences and Systems},
+  pages={2},
+  year={2013},
+  organization={ACM}
+}
+@inproceedings{mapgraph,
+  author = {Fu, Zhisong and Personick, Michael and Thompson, Bryan},
+  title = {MapGraph: A High Level API for Fast Development of High Performance Graph Analytics on GPUs},
+  booktitle = {Proceedings of Workshop on GRAph Data Management Experiences and Systems},
+  series = {GRADES'14},
+  year = {2014},
+  isbn = {978-1-4503-2982-8},
+  location = {Snowbird, UT, USA},
+  pages = {2:1--2:6},
+  articleno = {2},
+  numpages = {6},
+  url = {http://doi.acm.org/10.1145/2621934.2621936},
+  doi = {10.1145/2621934.2621936},
+  acmid = {2621936},
+  publisher = {ACM},
+  address = {New York, NY, USA},
+  keywords = {GPU, Graph analytics, high-level API},
+}
+@inproceedings{durand2012packed,
+  title={A Packed Memory Array to Keep Moving Particles Sorted},
+  author={Durand, Marie and Raffin, Bruno and Faure, Fran{\c{c}}ois},
+  booktitle={9th Workshop on Virtual Reality Interaction and Physical Simulation (VRIPHYS)},
+  pages={69--77},
+  year={2012},
+  organization={The Eurographics Association}
+}
 \end{filecontents}
 
 \begin{document}
@@ -135,6 +179,13 @@ for i in range(1, T):
   simulateInteractions(newGrid) # Done in parallel
   barrier()
   simulateMovements(newGrid) # Done in parallel
+
+def insertIntoGrid(oldGrid, newGrid):
+  parfor square in oldGrid: # thread j handles block of squares j
+    for particle in square:
+      lock(locks[destinationSquareIndex(particle)])
+      insert(particle, newGrid.destinationSquare(particle))
+      unlock(locks[destinationSquareIndex(particle)])
 \end{verbatim}
 
 \begin{description}
@@ -149,36 +200,59 @@ for i in range(1, T):
 \end{description}
 
 \subsection{Results}
-%synchronization
-% Describe algorithm: Grid data structure; threads handle subgrids; communication between threads is implicit and of size O(particles that moved across subgrid boundaries)
-% Describe synchronization: Locking on grid inserts (monotonic operation) plus barriers before/after reads.
-% Plot: O(n) scaling on Hopper: n = 250, 1000, 4000, 16000, 64000, 256000
-% Plot: Weak scaling(?) on Hopper: p = 1, 2, 4, 8, 16, 24; n = 250, 1000, 4000, 16000, 64000 (* number of cores) [use more / less if possible on Hopper]
-% Plot: Strong scaling(?) on Hopper: p = 1, 2, 4, 8, 16, 24; n = 250, 1000, 4000, 16000, 64000, 256000
+Figure \ref{fig:openmp-on} shows that our algorithm scales linearly with problem size, for $p=1$ or $p=24$ threads.  Figure \ref{fig:openmp-weak} shows weak scaling: We increase the number of threads, increasing $n$ proportionally, for various base problem sizes.  Our algorithm does not enjoy weak scaling; a least-squares fit of log-performance against $\alpha \log n$ gives $\alpha \approxeq 1/2$ for large $n$, indicating that the asymptotic performance could be $O(n/\sqrt{p})$.  Figure \ref{fig:openmp-strong} gives similarly bad news for strong scaling.
 
 \section{MPI Implementation}
+% Describe algorithm: ???
 % Plot: O(n) scaling on Hopper: n = 1000, 4000, 16000, 64000, 256000
 % Plot: Weak scaling(?) on Hopper: p = 1, 4, 16, 64, 256
 % Plot: Strong scaling(?) on Hopper: p = 1, 4, 16, 64, 256
 % Plot: Compare grid- and non-grid O((n/p)^2) code for small problem sizes.
 
 \section{CUDA Implementation}
-% Describe algorithm.
-% Describe sorting algorithm and plans for future work.
-% Plot: Compare with naive: n = 250, 1000, 4000, 16000, 64000(?)
-% Plot: O(n) scaling on Stampede: n = 250, 1000, 4000, 16000, 64000, 256000, 1024000, 4096000
-% Plot: Laptop versus Stampede: n = 250, 1000, 4000, 16000, 64000, 256000, 1024000, 4096000 [last two on Stampede only due to memory constraints]
+Our CUDA implementation is similar to our others, except for the step that builds the grid data structure.  In our other code, each grid square is a pointer to a dynamic array of pointers to a global list of particles.  This means that inserting into the grid requires dynamic allocation of memory and locking, both of which are purportedly expensive on the GPU.  Instead, we store particles in a flat array, sorted by grid square location in column-major order.  A separate array stores pointers from grid square index to the first particle contained in the grid square.  This allows us to use Thrust's efficient implementation of \code{sort()} to rebuild the grid.
+
+Pseudocode for the relevant parts of our algorithm (slightly cleaner than what is actually needed to implement this in Thrust) looks like this:
+\begin{verbatim}
+for i in range(1, T):
+  rebuildGrid(particles, gridPointers)
+  simulateInteractions(particles, gridPointers)
+  simulateMovements(particles)
+  
+def rebuildGrid(particles, gridPointers):
+  newGridIndices = particles.map(destinationSquareIndex)
+  particles.sortByKey(newGridIndices, particles)
+  # Now compute the grid offsets from the sorted particles:
+  newGridCounts = newGridIndices.map(i => (i, 1)).reduceByKey(0, +)
+  padWithZeros(newGridCounts) # Ensure that any empty grid squares are indexed.
+  newGridOffsets = newGridCounts.exclusiveScan(0, +)
+\end{verbatim}
+
+Each of the steps in \code{rebuildGrid} can be implemented using only constant memory that is preallocated in the GPU.  Thrust's \code{sort()} has a reputation for being highly optimized, so it is possible that it would be hard to beat our implementation without heavy optimization.  However, since we use a generic sorting algorithm, we do pay an additional $\log(n)$ factor on each iteration, so that our algorithm technically runs in $O(T n \log n)$ time.  This seems to be irrelevant for all problem sizes that would fit into GPU memory on the machines we used -- the code actually scales sublinearly.  Still, we will discuss some potential improvements in Section \ref{sec:future}.
+
+There is another way in which Thrust's mapreduce-like interface does not map well to this problem: Our implementation of \code{simulateInteractions} had to be done in raw CUDA (using essentially the same code as other parallel interaction steps) rather than using Thrust primitives.  Simulating interactions in mapreduce requires zipping each particle with its neighboring particles, but we could find no efficient or even natural way to do that in Thrust.  But it is nice that Thrust allows us to go back and forth between its vector abstraction and a raw block of device memory.
+
+\subsection{Results}
+Figure \ref{fig:gpu-on} shows that our implementation's runtime scales linearly with $n$.  (In fact, there seems to be a constant or $o(1)$ term in the runtime, since it scales slightly sublinearly.)  Figure \ref{fig:gpu-naive} compares our implementation with the naive algorithm; it is much faster than the naive $O(n^2)$ algorithm even for the smallest simulation size.  This suggests that using Thrust does not introduce any significant constant overhead, since the naive algorithm is simple, bare CUDA.
+
+Finally, in Figure \ref{fig:gpu-laptop} we compare the performance of the NVIDIA K20 GPU with the Geforce GT 650M in a Macbook Pro.  The K20 is about 4 times as fast for the largest problem size, and it can handle much larger problems (it has 5 times as much memory, and the 650M was simultaneously driving a retina Macbook display).
 
 \section{Observations}
+We close with some observations.
 
 \subsection{Performance Comparison}
-% One plot with all algorithms: serial-naive, serial, OpenMP (p=24), MPI (p=24), MPI (p=256), CUDA-naive, CUDA, CUDA-laptop: n = 250, 1000, 4000, 16000, 64000, 256000, 1024000, 4096000 [as applicable]
+Figure \ref{fig:all} shows the performance of all the implementations we have discussed.  Some takeaways:
+\begin{description}
+  \item[Asymptotics are important:] The $O(n)$ algorithm beat the $O(n^2)$ algorithm at modest problem sizes -- $n=250$ for serial code and at $n=4000$ for GPU code -- despite using more complex data structures.
+  \item[GPUs win:] Running on Stampede, the GPU code beats all other implementations by a factor of roughly 3 for large problem sizes.  This is true even for MPI code running on 11 Hopper nodes.  GPU code running on a laptop is competitive with MPI code on a small cluster.  However, the GPU is limited by the availability of memory ($n=256000$ for the laptop and $n=16384000$ for Stampede), while the MPI code could presumably scale to even larger problems than we tested, albeit very slowly.  This limitation could potentially be lifted by swapping to machine memory, but that would diminish or eliminate the benefits of using the GPU.
+\end{description}
 
-\subsection{Programming Environment}
-% OpenMP: One difficulty was that there are no fine-grained locks without full memory barriers.
-% CUDA: We used Thrust.  Provides a mapreduce-style interface, though not really mapreduce (since things are necessarily mutable).  Some opaque crashes.  Mapreduce is not quite the right abstraction for us; something like GraphLab would have been better.  As is, we had to use a general sort, which technically introduces O(n log n) scaling, though this was unnoticeable in our tests.  And we had to break out of Thrust for the force simulation.
+\subsection{Future Work}
+None of the programming models we used in this project were perfectly suited to the problem.  In each case, it was difficult to minimize communication when building the grid data structure and using it to simulate particle interactions.  Instead, it seems best to think of particle simulation as a graph-parallel problem.  In every implementation we discretize the problem domain into squares; each square does bounded work (since the number of particles per square is bounded) and communicates particles and forces with a bounded number of neighbors on each iteration.  It is natural to think of the squares as nodes in a (dynamic) graph of bounded degree.  Systems like GraphLab \cite{graphlab} or GraphX \cite{graphx} therefore ought to provide an easy and efficient way to implement our particle simulator.  A recent system, MapGraph, could even be used to run on a GPU.  It would be interesting to investigate this.
 
-%\bibliographystyle{plain}
-%\bibliography{\jobname}
+Another interesting question raised by this assignment is: What is a better approach to reordering particles in the GPU code?  Thrust's \code{sort()} does not seem to introduce a noticeable bottleneck in practice, so this is largely an academic exercise.  But in theory, we have introduced an $O(n \log n)$ step in an algorithm that could run in $O(n)$ time.  We could fix this by using a sorting algorithm that (1) sorts in place, (2) sorts in parallel on a GPU, and (3) takes $O(M)$ time, where $M$ is the total distance traveled by particles from their original order.  In other words, we can take advantage of the fact that the list of particles stays \emph{nearly sorted} on each iteration.  (This is equivalent to the fact that the computation graph in GraphLab would be of bounded degree.)  There are two difficulties that may not be resolvable.  First, we know of no such sorting algorithm.  Second, we would need to sort on a one-dimensional embedding of the particles that ensures all neighboring particles, and not too many more particles on average, appear as neighbors (say, within $k$ places of the particle) in the sorted order.  We are not sure if such a scheme is possible.  (Locality-sensitive hashing is one potential method.)  There is some related work to explore \cite{durand2012packed}.
+
+\bibliographystyle{plain}
+\bibliography{\jobname}
 
 \end{document}
