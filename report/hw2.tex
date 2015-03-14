@@ -3,6 +3,7 @@
 \usepackage[retainorgcmds]{IEEEtrantools}
 \usepackage{filecontents}
 \usepackage{hyperref}
+\usepackage{graphicx}
 \author{Derek Kuo, Henry Milner}
 \title{CS267 HW2: Particle Simulation}
 \date{3/13/15}
@@ -153,9 +154,27 @@ We run our experiments in three different computing environments.  Most experime
 Our serial implementation uses a grid data structure to execute the interaction step in $O(n)$ time.  The box is divided into $O(n)$ equal squares (approximately $n$ squares in our implementation), which are large enough that a particle can only interact with particles in its own square and its 8 neighboring squares on a single iteration.  Squares are stored in a flat vector in column-major order, and each square contains a pointer to a vector of pointers to the particles it currently contains.  In the interaction step, each particle only needs to be checked for interactions with particles in 9 squares; since the number of particles per square is bounded (and equal to 1 on average), the interaction step takes $O(n)$ time.  After the movement step, particles must be mapped to new grid squares, so we simply build a new grid serially, which takes $O(n)$ time.
 
 \subsection{Results}
-Serial-hopper \ref{fig:serial-on} shows that our algorithm indeed enjoys linear ($O(n)$) scaling.  For comparison, Figure \ref{fig:serial-naive} shows the performance of the naive $O(n^2)$ algorithm on smaller problems.
+Figure \ref{fig:serial-on} shows that our algorithm indeed enjoys linear ($O(n)$) scaling.  For comparison, Figure \ref{fig:serial-naive} shows the performance of the naive $O(n^2)$ algorithm on smaller problems.
 
 We also ran our experiments on our laptop, and the laptop runs the serial code faster than the Hopper nodes, which are not designed for serial performance.  Figure \ref{fig:serial-laptop} shows the results; the laptop does slightly outperform Hopper.
+
+\begin{figure}
+  \includegraphics[width=\textwidth]{plots/Serial-Hopper.png}
+  \caption{$O(n)$ scaling of the serial algorithm.}
+  \label{fig:serial-on}
+\end{figure}
+
+\begin{figure}
+  \includegraphics[width=\textwidth]{plots/Serial-Naive.png}
+  \caption{Performance of the $O(n^2)$ serial algorithm.}
+  \label{fig:serial-naive}
+\end{figure}
+
+\begin{figure}
+  \includegraphics[width=\textwidth]{plots/Serial-laptop-vs-hopper.png}
+  \caption{Performance of the serial algorithm on Hopper and a laptop.  (Running time is the on the y axis, and problem size is on the x axis.  Smaller is better.)}
+  \label{fig:serial-laptop}
+\end{figure}
 
 \section{OpenMP Implementation}
 Our OpenMP implementation uses a similar grid data structure.  To maximize cache locality, each thread is assigned a block of grid squares whose particles' accelerations it must compute in the interaction step.  With this scheme, a thread needs only read particles from its own squares and from squares bordering its block.  The grid itself is also built in parallel.  After movement, each thread inserts into a new shared grid data structure all the particles that were in its block before movement.  Each square uses a separate \code{omp\_lock\_t} to ensure that inserts are atomic.
@@ -202,17 +221,35 @@ def insertIntoGrid(oldGrid, newGrid):
 \subsection{Results}
 Figure \ref{fig:openmp-on} shows that our algorithm scales linearly with problem size, for $p=1$ or $p=24$ threads.  Figure \ref{fig:openmp-weak} shows weak scaling: We increase the number of threads, increasing $n$ proportionally, for various base problem sizes.  Our algorithm does not enjoy weak scaling; a least-squares fit of log-performance against $\alpha \log n$ gives $\alpha \approxeq 1/2$ for large $n$, indicating that the asymptotic performance could be $O(n/\sqrt{p})$.  Figure \ref{fig:openmp-strong} gives similarly bad news for strong scaling.
 
+\begin{figure}
+  \includegraphics[width=\textwidth]{plots/OpenMP-Thread1-vs-Thread24.png}
+  \caption{$O(n)$ scaling of the OpenMP implementation using $1$ and $24$ threads.}
+  \label{fig:openmp-on}
+\end{figure}
+
+\begin{figure}
+  \includegraphics[width=\textwidth]{plots/OpenMP-weak-scaling.png}
+  \caption{Weak scaling of the OpenMP implementation, for various base problem sizes.}
+  \label{fig:openmp-weak}
+\end{figure}
+
+\begin{figure}
+  \includegraphics[width=\textwidth]{plots/OpenMP-Strong-scaling.png}
+  \caption{Strong scaling of the OpenMP implementation, for various base problem sizes.}
+  \label{fig:openmp-strong}
+\end{figure}
+
 \section{MPI Implementation}
-Our MPI implementation centered on three parts: 1) the division of particle regions for each node - how over all particles are divided and handled. 2) the communication and message format passing among each node - what different type of information are passed through MPI commands. 3) the faster O(n) algorithm achieved by grids.
+Our MPI implementation centered on three parts: (1) the division of particle regions for each node - how over all particles are divided and handled; (2) the communication and message format passing among each node - what different type of information are passed through MPI commands; and (3) the faster $O(n)$ algorithm achieved by grids.
 
 \subsection{The division of particles}
-Initially, the master node (rank=0) scan all of the particles and assigned them into corresponding processor based on their locations on the map. Based on different number of nodes user specified, the program equally divided the region into subregion administrated by each node. In it's own region, the node calculated the force and move the particles based on local data. Two types of local data have been recorded: (1) Nodes inside the region (2) Nodes outside the region but is in the boundary region <within the region that just one grid width beyond the inside region. With these two local data, each node have sufficient information to calculate it's own particles' movement.
+Initially, the master node (rank=0) scans all of the particles and assigns them to a processor based on their locations in the box. Based on the number of nodes specified by the user, the program equally divides the region into subregion administrated by each node. In its own region, the node calculates forces and moves particles based on local data. A node holds two types of local data: (1) particles inside the region (2) particles outside the region but in the boundary of squares immediately around the region. With this local data, each node has sufficient information to calculate its own particles' movements.
 
 \subsection{Communication between nodes}
-After applying force and make movement, each particle will have a new coordinate. Each node started to examine if <1> it's own particles have moved outside the region or <2> it's still inside the region but it's at the boundary of other nodes. <3> inside the region and not at boundary. The node then use MPI_Isend() and MPI_Recv() to communicate with other nodes and send the list of type <1> and type <2> particles to the exact nodes they should received. One thing to note is we are using non-blocking MPI_Isend() and blocking MPI_Recv() to avoid deadlock.
+After applying forces and movements, each particle has a new coordinate. Each node checks whether its particles have (1) moved outside the region; (2) stayed inside the region but at the boundary of other nodes; or (3) stayed inside the region and not at boundary. The node then use \code{MPI\_Isend()} and \code{MPI\_Recv()} to communicate with other nodes and send the list of type (1) and type (2) particles to the exact nodes they should received. One thing to note is we are using non-blocking \code{MPI\_Isend()} and blocking \code{MPI\_Recv()} to avoid deadlock.
 
 \subsection{Faster algorithm with grid}
-Similar to OpenMP, the MPI are also using grid data structure to improve the time efficiency to O(n). However, instead of shared grid structure, each node maintain it's own local grids and only store the local nodes into the grids. The advantage to do grid locally is the avoidance of racing conditions. The drawback is we need to update the grid in every step, potentially increasing the computation time in addition to update the particles.
+Similar to OpenMP, the MPI implementation uses a grid data structure to improve the time efficiency to $O(n)$. However, instead of shared grid structure, each node maintains its own local grid. In principle, we could use an $O(n^2)$ algorithm locally, if the subproblem solved by each node were too small to justify the overhead of maintaining a grid.  In practice, it is better to use the linear algorithm.
 
 \subsection{pseudocode}
 
@@ -232,7 +269,25 @@ For each step within each node:
 \end{verbatim}
 
 \subsection{Results}
-Figure \ref{fig:mpi-on} shows that our algorithm scales linearly with problem size, for $p=1$ or $p=16$ nodes.  Figure \ref{fig:mpi-weak} shows weak scaling: We increase the number of nodes, increasing $n$ proportionally, for various base problem sizes.  Our MPI algorithm has enjoyed better weak scaling, although not perfect.  Figure \ref{fig:mpi-strong} gives also displayed the same situation.
+Figure \ref{fig:mpi-on} shows that our algorithm scales linearly with problem size, for $p=1$ or $p=16$ nodes.  Figure \ref{fig:mpi-weak} shows weak scaling: We increase the number of nodes, increasing $n$ proportionally, for various base problem sizes.  Our MPI algorithm enjoys better weak scaling, although not perfect.  Figure \ref{fig:mpi-strong} shows a similar situation for strong scaling.
+
+\begin{figure}
+  \includegraphics[width=\textwidth]{plots/MPI-node1-vs-node16.png}
+  \caption{$O(n)$ scaling of the MPI implementation using $1$ and $16$ nodes.}
+  \label{fig:mpi-on}
+\end{figure}
+
+\begin{figure}
+  \includegraphics[width=\textwidth]{plots/MPI-weak-scaling.png}
+  \caption{Weak scaling of the MPI implementation, for various base problem sizes.}
+  \label{fig:mpi-weak}
+\end{figure}
+
+\begin{figure}
+  \includegraphics[width=\textwidth]{plots/MPI-strong-scaling.png}
+  \caption{Strong scaling of the MPI implementation, for various base problem sizes.}
+  \label{fig:mpi-strong}
+\end{figure}
 
 \section{CUDA Implementation}
 Our CUDA implementation is similar to our others, except for the step that builds the grid data structure.  In our other code, each grid square is a pointer to a dynamic array of pointers to a global list of particles.  This means that inserting into the grid requires dynamic allocation of memory and locking, both of which are purportedly expensive on the GPU.  Instead, we store particles in a flat array, sorted by grid square location in column-major order.  A separate array stores pointers from grid square index to the first particle contained in the grid square.  This allows us to use Thrust's efficient implementation of \code{sort()} to rebuild the grid.
@@ -263,20 +318,48 @@ Figure \ref{fig:gpu-on} shows that our implementation's runtime scales linearly 
 
 Finally, in Figure \ref{fig:gpu-laptop} we compare the performance of the NVIDIA K20 GPU with the Geforce GT 650M in a Macbook Pro.  The K20 is about 4 times as fast for the largest problem size, and it can handle much larger problems (it has 5 times as much memory, and the 650M was simultaneously driving a retina Macbook display).
 
+\begin{figure}
+  \includegraphics[width=\textwidth]{plots/CUDA-hopper.png}
+  \caption{$O(n)$ scaling of the CUDA implementation.}
+  \label{fig:gpu-on}
+\end{figure}
+
+\begin{figure}
+  \includegraphics[width=\textwidth]{plots/CUDA-naive.png}
+  \caption{Comparison of the CUDA implementation with the naive $O(n^2)$ version.}
+  \label{fig:gpu-naive}
+\end{figure}
+
+\begin{figure}
+  \includegraphics[width=\textwidth]{plots/CUDA-laptop.png}
+  \caption{Comparison of CUDA code running on a laptop and on a Stampede node.}
+  \label{fig:gpu-laptop}
+\end{figure}
+
 \section{Observations}
 We close with some observations.
 
 \subsection{Performance Comparison}
 Figure \ref{fig:all} shows the performance of all the implementations we have discussed.  Some takeaways:
 \begin{description}
-  \item[Asymptotics are important:] The $O(n)$ algorithm beat the $O(n^2)$ algorithm at modest problem sizes -- $n=250$ for serial code and at $n=4000$ for GPU code -- despite using more complex data structures.
+  \item[Asymptotics are important:] The $O(n)$ algorithm beat the $O(n^2)$ algorithm at modest problem sizes -- at $n=250$ for serial code and at $n=4000$ for GPU code -- despite using more complex data structures.
   \item[GPUs win:] Running on Stampede, the GPU code beats all other implementations by a factor of roughly 3 for large problem sizes.  This is true even for MPI code running on 11 Hopper nodes.  GPU code running on a laptop is competitive with MPI code on a small cluster.  However, the GPU is limited by the availability of memory ($n=256000$ for the laptop and $n=16384000$ for Stampede), while the MPI code could presumably scale to even larger problems than we tested, albeit very slowly.  This limitation could potentially be lifted by swapping to machine memory, but that would diminish or eliminate the benefits of using the GPU.
 \end{description}
 
+\begin{figure}
+  \includegraphics[width=\textwidth]{plots/Overall.png}
+  \caption{Comparison of all particle simulator implementations.}
+  \label{fig:all}
+\end{figure}
+
 \subsection{Future Work}
+\label{sec:future}
 None of the programming models we used in this project were perfectly suited to the problem.  In each case, it was difficult to minimize communication when building the grid data structure and using it to simulate particle interactions.  Instead, it seems best to think of particle simulation as a graph-parallel problem.  In every implementation we discretize the problem domain into squares; each square does bounded work (since the number of particles per square is bounded) and communicates particles and forces with a bounded number of neighbors on each iteration.  It is natural to think of the squares as nodes in a (dynamic) graph of bounded degree.  Systems like GraphLab \cite{graphlab} or GraphX \cite{graphx} therefore ought to provide an easy and efficient way to implement our particle simulator.  A recent system, MapGraph, could even be used to run on a GPU.  It would be interesting to investigate this.
 
-Another interesting question raised by this assignment is: What is a better approach to reordering particles in the GPU code?  Thrust's \code{sort()} does not seem to introduce a noticeable bottleneck in practice, so this is largely an academic exercise.  But in theory, we have introduced an $O(n \log n)$ step in an algorithm that could run in $O(n)$ time.  We could fix this by using a sorting algorithm that (1) sorts in place, (2) sorts in parallel on a GPU, and (3) takes $O(M)$ time, where $M$ is the total distance traveled by particles from their original order.  In other words, we can take advantage of the fact that the list of particles stays \emph{nearly sorted} on each iteration.  (This is equivalent to the fact that the computation graph in GraphLab would be of bounded degree.)  There are two difficulties that may not be resolvable.  First, we know of no such sorting algorithm.  Second, we would need to sort on a one-dimensional embedding of the particles that ensures all neighboring particles, and not too many more particles on average, appear as neighbors (say, within $k$ places of the particle) in the sorted order.  We are not sure if such a scheme is possible.  (Locality-sensitive hashing is one potential method.)  There is some related work to explore \cite{durand2012packed}.
+Another interesting question raised by this assignment is: What is a better approach to reordering particles in the GPU code?  Thrust's \code{sort()} does not seem to introduce a noticeable bottleneck in practice, so this is largely an academic exercise.  But in theory, we have introduced an $O(n \log n)$ step in an algorithm that could run in $O(n)$ time.  We could fix this by using a sorting algorithm that (1) sorts in place, (2) sorts in parallel on a GPU, and (3) takes $O(M)$ time, where $M$ is the total distance traveled by particles from their original order.  In other words, we can take advantage of the fact that the list of particles stays \emph{nearly sorted} on each iteration.  (This is equivalent to the fact that the computation graph in GraphLab would be of bounded degree.)  There are two difficulties that may not be resolvable.  First, we know of no such sorting algorithm.  Second, we would need to sort on a one-dimensional embedding of the particles that ensures all neighboring particles, and not too many more particles on average, appear as neighbors (say, within $k$ places of the particle) in the sorted order.  We are not sure if such a scheme is possible.  (Locality-sensitive hashing is one potential method.)  There is some recent related work to explore: \cite{durand2012packed}.
+
+\section{Notes on Running Our Code}
+We used GNU g++ to compile all parts of our code (other than that compiled with nvcc).  On Hopper, please run \code{module swap PrgEnv-pgi PrgEnv-gnu} before attempting to run the build.  On Stampede, run \code{module load cuda} before building.
 
 \bibliographystyle{plain}
 \bibliography{\jobname}

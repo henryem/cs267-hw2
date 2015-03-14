@@ -70,7 +70,7 @@ ifdef SUPPORTS_GPU
 endif
 CLEAN_TARGETS = $(TARGETS) $(HW_NAME).tar.gz report.pdf
 
-HW_NAME = 27_hw2
+HW_NAME = derekkuo_henrymilner_hw2
 
 all:	$(TARGETS)
 
