@@ -153,7 +153,7 @@ We run our experiments in three different computing environments.  Most experime
 Our serial implementation uses a grid data structure to execute the interaction step in $O(n)$ time.  The box is divided into $O(n)$ equal squares (approximately $n$ squares in our implementation), which are large enough that a particle can only interact with particles in its own square and its 8 neighboring squares on a single iteration.  Squares are stored in a flat vector in column-major order, and each square contains a pointer to a vector of pointers to the particles it currently contains.  In the interaction step, each particle only needs to be checked for interactions with particles in 9 squares; since the number of particles per square is bounded (and equal to 1 on average), the interaction step takes $O(n)$ time.  After the movement step, particles must be mapped to new grid squares, so we simply build a new grid serially, which takes $O(n)$ time.
 
 \subsection{Results}
-Figure \ref{fig:serial-on} shows that our algorithm indeed enjoys linear ($O(n)$) scaling.  For comparison, Figure \ref{fig:serial-naive} shows the performance of the naive $O(n^2)$ algorithm on smaller problems.
+Serial-hopper \ref{fig:serial-on} shows that our algorithm indeed enjoys linear ($O(n)$) scaling.  For comparison, Figure \ref{fig:serial-naive} shows the performance of the naive $O(n^2)$ algorithm on smaller problems.
 
 We also ran our experiments on our laptop, and the laptop runs the serial code faster than the Hopper nodes, which are not designed for serial performance.  Figure \ref{fig:serial-laptop} shows the results; the laptop does slightly outperform Hopper.
 
@@ -203,16 +203,42 @@ def insertIntoGrid(oldGrid, newGrid):
 Figure \ref{fig:openmp-on} shows that our algorithm scales linearly with problem size, for $p=1$ or $p=24$ threads.  Figure \ref{fig:openmp-weak} shows weak scaling: We increase the number of threads, increasing $n$ proportionally, for various base problem sizes.  Our algorithm does not enjoy weak scaling; a least-squares fit of log-performance against $\alpha \log n$ gives $\alpha \approxeq 1/2$ for large $n$, indicating that the asymptotic performance could be $O(n/\sqrt{p})$.  Figure \ref{fig:openmp-strong} gives similarly bad news for strong scaling.
 
 \section{MPI Implementation}
-% Describe algorithm: ???
-% Plot: O(n) scaling on Hopper: n = 1000, 4000, 16000, 64000, 256000
-% Plot: Weak scaling(?) on Hopper: p = 1, 4, 16, 64, 256
-% Plot: Strong scaling(?) on Hopper: p = 1, 4, 16, 64, 256
-% Plot: Compare grid- and non-grid O((n/p)^2) code for small problem sizes.
+Our MPI implementation centered on three parts: 1) the division of particle regions for each node - how over all particles are divided and handled. 2) the communication and message format passing among each node - what different type of information are passed through MPI commands. 3) the faster O(n) algorithm achieved by grids.
+
+\subsection{The division of particles}
+Initially, the master node (rank=0) scan all of the particles and assigned them into corresponding processor based on their locations on the map. Based on different number of nodes user specified, the program equally divided the region into subregion administrated by each node. In it's own region, the node calculated the force and move the particles based on local data. Two types of local data have been recorded: (1) Nodes inside the region (2) Nodes outside the region but is in the boundary region <within the region that just one grid width beyond the inside region. With these two local data, each node have sufficient information to calculate it's own particles' movement.
+
+\subsection{Communication between nodes}
+After applying force and make movement, each particle will have a new coordinate. Each node started to examine if <1> it's own particles have moved outside the region or <2> it's still inside the region but it's at the boundary of other nodes. <3> inside the region and not at boundary. The node then use MPI_Isend() and MPI_Recv() to communicate with other nodes and send the list of type <1> and type <2> particles to the exact nodes they should received. One thing to note is we are using non-blocking MPI_Isend() and blocking MPI_Recv() to avoid deadlock.
+
+\subsection{Faster algorithm with grid}
+Similar to OpenMP, the MPI are also using grid data structure to improve the time efficiency to O(n). However, instead of shared grid structure, each node maintain it's own local grids and only store the local nodes into the grids. The advantage to do grid locally is the avoidance of racing conditions. The drawback is we need to update the grid in every step, potentially increasing the computation time in addition to update the particles.
+
+\subsection{pseudocode}
+
+\begin{verbatim}
+For each step within each node:
+  ApplyForce(innerParticles, localGrid)
+  ApplyForce(innerParticles, boundryParticles)
+  Move(innerParticles)
+  ScanParticles(innerParticles)
+  CommunicateOutside(outsideParticlesAfterMove)
+  CommunicateBoundryParticle(boudryParticlesAfterMove)
+  ReceiveOutsideParticles(outsideBuf)
+  ReceiveBoundryParticles(boundryBuf)
+  UpdateInnerParticles(outsideBuf)
+  UpdateLocalGrid(outsidebuf)
+  
+\end{verbatim}
+
+\subsection{Results}
+Figure \ref{fig:mpi-on} shows that our algorithm scales linearly with problem size, for $p=1$ or $p=16$ nodes.  Figure \ref{fig:mpi-weak} shows weak scaling: We increase the number of nodes, increasing $n$ proportionally, for various base problem sizes.  Our MPI algorithm has enjoyed better weak scaling, although not perfect.  Figure \ref{fig:mpi-strong} gives also displayed the same situation.
 
 \section{CUDA Implementation}
 Our CUDA implementation is similar to our others, except for the step that builds the grid data structure.  In our other code, each grid square is a pointer to a dynamic array of pointers to a global list of particles.  This means that inserting into the grid requires dynamic allocation of memory and locking, both of which are purportedly expensive on the GPU.  Instead, we store particles in a flat array, sorted by grid square location in column-major order.  A separate array stores pointers from grid square index to the first particle contained in the grid square.  This allows us to use Thrust's efficient implementation of \code{sort()} to rebuild the grid.
 
 Pseudocode for the relevant parts of our algorithm (slightly cleaner than what is actually needed to implement this in Thrust) looks like this:
+
 \begin{verbatim}
 for i in range(1, T):
   rebuildGrid(particles, gridPointers)
